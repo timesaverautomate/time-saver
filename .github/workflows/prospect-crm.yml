@@ -2,18 +2,21 @@ name: TimeSaver - pesquisar contactos B2B
 on:
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: Simular sem escrever no CRM?
+      mode:
+        description: 'Simular ou testar escrita de 2 empresas no CRM (bloqueadas para contacto)'
         required: true
         type: choice
         options:
-          - 'true'
-          - 'false'
-        default: 'true'
+          - simular
+          - teste_escrita_2
+        default: simular
   schedule:
     - cron: '15 8 * * 1-5'
 permissions:
   contents: read
+concurrency:
+  group: timesaver-prospeccao-crm
+  cancel-in-progress: false
 jobs:
   pesquisar:
     runs-on: ubuntu-latest
@@ -23,9 +26,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install google-auth requests
-      - name: Pesquisa CRM sem envios
+      - name: Instalar dependencias
+        run: pip install google-auth requests
+      - name: Testes de seguranca do CRM
+        run: python -m unittest discover -s tests -p 'test_prospect_crm.py' -v
+      - name: Pesquisa CRM (sem envios)
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          DRY_RUN: ${{ github.event_name == 'schedule' && 'true' || inputs.dry_run || 'true' }}
+          CRM_MODE: ${{ github.event_name == 'schedule' && 'simular' || inputs.mode || 'simular' }}
         run: python scripts/prospect_crm.py
