@@ -3,22 +3,40 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Simular ou testar escrita de 2 empresas no CRM (bloqueadas para contacto)'
+        description: 'Simular ou testar escrita de 2 empresas (sem emails)'
         required: true
         type: choice
-        options:
-          - simular
-          - teste_escrita_2
+        options: [simular, teste_escrita_2]
         default: simular
   schedule:
     - cron: '15 8 * * 1-5'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/prospect-crm.yml'
+      - 'scripts/prospect_crm.py'
+      - 'tests/test_prospect_crm.py'
 permissions:
   contents: read
 concurrency:
   group: timesaver-prospeccao-crm
   cancel-in-progress: false
 jobs:
+  validar:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar dependencias
+        run: pip install google-auth requests
+      - name: Testes de seguranca sem pesquisa ou escrita
+        run: python -m unittest discover -s tests -p 'test_prospect_crm.py' -v
   pesquisar:
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -33,5 +51,6 @@ jobs:
       - name: Pesquisa CRM (sem envios)
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          CRM_MODE: ${{ github.event_name == 'schedule' && 'simular' || inputs.mode || 'simular' }}
+          CRM_MODE: ${{ github.event_name == 'schedule' && 'diario' || inputs.mode || 'simular' }}
+          CRM_DAILY_WRITE_ENABLED: ${{ vars.CRM_DAILY_WRITE_ENABLED || 'false' }}
         run: python scripts/prospect_crm.py
