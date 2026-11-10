@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.dev.vars*
+.wrangler/
+.sites-runtime/
+work/
+*.tar.gz
+*.zip
+*.log

@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "time-saver",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "vars": {
+    "MAIL_ENABLED": "false",
+    "LEGAL_READY": "false",
+    "PUBLIC_ORIGIN": "https://www.exemplo.pt",
+    "HSTS_ENABLED": "false"
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "time-saver-security",
+    "database_id": "SUBSTITUIR_PELO_ID_D1",
+    "migrations_dir": "migrations"
+  }],
+  "triggers": { "crons": ["17 * * * *"] }
+}

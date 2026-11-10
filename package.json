@@ -1,0 +1,15 @@
+{
+  "name": "time-saver",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && node --experimental-sqlite --test tests/*.test.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "check": "node --check src/worker.mjs && node --check public/app.js && npm test && npm run build",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply time-saver-security --remote"
+  }
+}
