@@ -56,7 +56,7 @@ export async function googleToken(env,fetcher=fetch){
   const signature=await crypto.subtle.sign('RSASSA-PKCS1-v1_5',key,new TextEncoder().encode(payload));
   const signed=payload+'.'+b64url(toBinary(new Uint8Array(signature)));
   const response=await fetcher(TOKEN,{
-    method:'POST',redirect:'error',signal:AbortSignal.timeout(12000),
+    method:'POST',redirect:'manual',signal:AbortSignal.timeout(12000),
     headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion:signed}).toString()
   });
@@ -67,7 +67,7 @@ export async function googleToken(env,fetcher=fetch){
 }
 async function sheetCall(url,access,fetcher,init={}){
   const response=await fetcher(url,{
-    redirect:'error',signal:AbortSignal.timeout(12000),
+    redirect:'manual',signal:AbortSignal.timeout(12000),
     ...init,headers:{Authorization:'Bearer '+access,...(init.headers||{})}
   });
   if(!response.ok)throw Error('sheets_api_'+response.status);
