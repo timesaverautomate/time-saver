@@ -4,7 +4,9 @@ const repository = process.env.GITHUB_REPOSITORY;
 const commit = process.env.GITHUB_SHA;
 const runId = process.env.GITHUB_RUN_ID;
 const token = process.env.GITHUB_TOKEN;
-if (repository !== 'usertechsitee/time-saver' || !/^[a-f0-9]{40}$/.test(commit || '') || !/^\d+$/.test(runId || '') || !token) {
+const repositoryId = process.env.GITHUB_REPOSITORY_ID;
+// O ID do repositório mantém a autorização vinculada ao projeto durante a transferência.
+if (repositoryId !== '1452563434' || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository || '') || !/^[a-f0-9]{40}$/.test(commit || '') || !/^\d+$/.test(runId || '') || !token) {
   console.error('O diagnóstico deve ser executado pelo workflow autorizado no repositório Time Saver.');
   process.exit(1);
 }
