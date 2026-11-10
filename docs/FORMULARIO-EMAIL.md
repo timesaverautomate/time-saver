@@ -1,4 +1,4 @@
-# Formulário atual: email direto, sem base de dados
+# Formulário atual: email direto e integração com Sheets em preparação
 
 ## Fluxo e conservação
 
@@ -7,11 +7,17 @@
 3. O Worker envia texto simples pelo Resend, com assunto e destinatário fixos. Não há gravação intermédia do pedido.
 4. A página mostra sucesso apenas quando o Resend devolve um identificador de aceitação. A entrega efetiva é verificada na caixa Gmail, não inferida dessa resposta.
 
-A aplicação não grava pedidos em D1, KV, Durable Objects, filas, CRM ou folhas de cálculo; não regista o conteúdo nos logs. A observabilidade do Worker está desativada. Os campos permanecem na página aberta em caso de falha e são limpos após a aceitação. As funções de preenchimento automático pertencem ao navegador do visitante.
+Enquanto a sincronização não estiver ativada, a aplicação não grava pedidos em D1, KV, Durable Objects, filas, CRM ou folhas de cálculo; não regista o conteúdo nos logs. A observabilidade do Worker está desativada. Os campos permanecem na página aberta em caso de falha e são limpos após a aceitação. As funções de preenchimento automático pertencem ao navegador do visitante.
 
 O Resend declara conservar conteúdo e registos 30 dias, com armazenamento nos EUA mesmo quando o envio sai da região europeia. As cópias de segurança do fornecedor podem prolongar a eliminação conforme a sua política. Não há promessa de apagamento imediato pelo site. O titular aceitou expressamente manter o serviço nestes termos. Referência: https://resend.com/security/gdpr/.
 
 A mensagem recebida permanece no Gmail. Rever mensalmente os pedidos encerrados e apagar os que já não sejam necessários para resposta, proposta, contrato, defesa de direitos ou obrigações aplicáveis. Esvaziar o lixo segundo as regras da caixa. Não existe um prazo legal universal de retenção de orçamentos. A adoção desta rotina e os contratos/garantias dos fornecedores são responsabilidades operacionais ainda por validar pelo titular.
+
+## Integração opcional com o CRM TimeSaver
+
+Foi preparado o separador privado `Pedidos do Site` no Google Sheets e o módulo `src/quote-sheets.mjs`. Quando a configuração `quoteSheetSyncEnabled` estiver ativa e a conta de serviço tiver acesso de escrita, o Worker guardará o pedido antes de fazer o envio transacional pelo Resend, sem expor a chave Google no browser ou nos logs. A referência é a chave de deduplicação; um novo pedido fica inicialmente com o estado `Pendente envio` e, após aceitação pelo Resend, muda para `Novo`. Se a gravação falhar, o formulário não apresenta sucesso e conserva os campos para repetir. A sincronização acrescenta uma cópia dos dados na Google e exige regras de acesso, retenção e apagamento.
+
+O módulo ainda requer validação operacional real antes da ativação; as políticas e contratos de tratamento também devem ser revistos.
 
 ## Remetente e DNS
 

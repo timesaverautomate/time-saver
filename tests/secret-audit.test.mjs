@@ -36,6 +36,22 @@ test('auditoria encontra credencial apagada do ficheiro atual sem imprimir o val
     assert.equal(data.secret_values_printed,false);
   } finally {rmSync(repo.directory,{recursive:true,force:true});}
 });
+test('auditoria deteta bloco PEM completo mas ignora texto de instruções',()=>{
+  const repo=repository();
+  try {
+    writeFileSync(path.join(repo.directory,'instructions.js'),
+      "const pattern = /-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----/;\\n");
+    repo.commit();
+    let result=spawnSync('python',[script,'--repository',repo.directory],{encoding:'utf8'});
+    assert.equal(result.status,0);
+    writeFileSync(path.join(repo.directory,'secret.txt'),
+      '-----BEGIN PRIVATE KEY-----\\n'+'A'.repeat(64)+'\\n-----END PRIVATE KEY-----\\n');
+    repo.commit();
+    result=spawnSync('python',[script,'--repository',repo.directory],{encoding:'utf8'});
+    assert.equal(result.status,1);
+    assert.ok(JSON.parse(result.stdout).findings.some(x=>x.rule==='private-key'));
+  } finally {rmSync(repo.directory,{recursive:true,force:true});}
+});
 test('auditoria deteta token Resend com hífen no histórico sem divulgar o valor',()=>{
   const repo=repository();
   try {

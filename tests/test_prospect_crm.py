@@ -62,7 +62,10 @@ class ProspectCrmTests(unittest.TestCase):
         daily = {**env, "GITHUB_EVENT_NAME": "schedule"}
         self.assertEqual(crm.validate_mode("diario", daily), "simular")
         daily["CRM_DAILY_WRITE_ENABLED"] = "true"
-        self.assertEqual(crm.validate_mode("diario", daily), "diario")
+        self.assertEqual(crm.validate_mode("diario", daily), "simular")
+        from unittest.mock import patch
+        with patch.object(crm, "DAILY_WRITE_APPROVED_IN_CODE", True):
+            self.assertEqual(crm.validate_mode("diario", daily), "diario")
         with self.assertRaises(RuntimeError):
             crm.validate_mode("diario", {**daily, "GITHUB_REPOSITORY_ID": "999"})
 

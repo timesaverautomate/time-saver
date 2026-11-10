@@ -40,7 +40,7 @@ test('mesma tentativa produz idempotência e corpo estáveis, sem depender de ar
   assert.deepEqual(a,b);assert.equal(f.calls[0].options.body,f.calls[1].options.body);
   assert.equal(f.calls[0].options.headers['Idempotency-Key'],f.calls[1].options.headers['Idempotency-Key']);
   const modules=await readSiteModules();
-  assert.deepEqual(Object.keys(modules).sort(),['contact.mjs','proxy.mjs','security.mjs','validation.mjs']);
+  assert.deepEqual(Object.keys(modules).sort(),['contact.mjs','proxy.mjs','quote-sheets.mjs','security.mjs','validation.mjs']);
   assert.doesNotMatch(Object.values(modules).join('\n'),/env\.DB|\.prepare\(|console\.log|localStorage|sessionStorage/);
 });
 test('validação do servidor rejeita opções, cabeçalhos, campos extra, honeypot e pedidos excessivos',async()=>{

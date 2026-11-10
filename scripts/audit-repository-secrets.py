@@ -19,7 +19,7 @@ RULES = [
     ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b")),
     ("github-fine-grained-token", re.compile(r"\bgithub_pat_[A-Za-z0-9_]{30,}\b")),
     ("aws-access-key", re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")),
-    ("private-key", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
+    ("private-key", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----\r?\n(?:[A-Za-z0-9+/=]{16,}\r?\n)+-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
     ("secret-assignment", re.compile(
         r"""(?:RESEND_(?:DOMAIN_)?API_KEY|SECURITY_HMAC_KEY|CLOUDFLARE_(?:(?:SITE|ZONE)_)?API_TOKEN|GITHUB_TOKEN)["']?\s*[:=]\s*["']([A-Za-z0-9_+/=-]{20,})["']""",
         re.IGNORECASE,
