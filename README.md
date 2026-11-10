@@ -2,7 +2,7 @@
 
 Website profissional em português de Portugal para apresentar serviços de automação e receber pedidos de orçamento.
 
-**Estado da entrega:** pré-lançamento público solicitado, preparado sem formulário e sem recolha de pedidos. Código e testes automáticos preparados; teste operacional Resend recebido e confirmado. O formulário comercial e a publicação final continuam dependentes das configurações e dados legais descritos abaixo. Nenhuma compra foi efetuada. Não são necessários ficheiros no seu PC para manter ou publicar este projeto.
+**Pré-lançamento no ar:** https://timesaverautomate.github.io/time-saver/ — publicado no GitHub Pages e verificado por HTTPS (HTTP 200), sem formulário ou recolha de pedidos. Código e testes automáticos preparados; teste operacional Resend recebido e confirmado. O domínio próprio e o formulário comercial continuam dependentes das configurações e dados legais descritos abaixo. Nenhuma compra foi efetuada. Não são necessários ficheiros no seu PC para manter ou publicar este projeto.
 
 ## Começar aqui
 
@@ -63,10 +63,12 @@ O frontend está preparado para GitHub Pages, com recursos locais e caminhos ada
 
     npm run build:pages
 
-O workflow de Pages constrói uma revisão, audita padrões de segredos no histórico e verifica a configuração de alojamento. A publicação comercial permanece bloqueada pelos marcadores legais. O modo explícito preview publica uma apresentação de pré-lançamento sem campos de recolha, sem os documentos legais incompletos e sem indexação; as minutas completas permanecem no código para revisão. O titular tornou o repositório público e ativou Pages com origem GitHub Actions, confirmado pela API. Falta a primeira publicação: o endereço do site ainda devolve 404 e o bloqueio de dados legais permanece ativo.
+O workflow de Pages constrói uma revisão, audita padrões de segredos no histórico e verifica a configuração de alojamento. A publicação comercial permanece bloqueada pelos marcadores legais. O modo explícito preview publica uma apresentação de pré-lançamento sem campos de recolha, sem os documentos legais incompletos e sem indexação; as minutas completas permanecem no código para revisão. O titular tornou o repositório público e ativou Pages com origem GitHub Actions, confirmado pela API. A publicação de pré-lançamento foi concluída com sucesso. O bloqueio de dados legais permanece ativo para o modo production.
 
 O backend é separado, porque GitHub Pages não executa funções de servidor. O Worker suporta API dedicada, CORS para a origem exata, validação, limites partilhados e proteção contra duplicados. Na exportação estática, o formulário permanece desativado até configurar um endpoint HTTPS real em QUOTE_API_ORIGIN e o backend confirmar disponibilidade. A chave Resend fica no servidor.
 
 As ações oficiais estão fixadas em SHAs completos. A configuração de cabeçalhos e TLS Cloudflare está documentada e preparada como modelo, sem afirmar que já foi aplicada. O repositório público não contém os valores dos segredos de Actions.
 
 A versão privada antiga no Sites mantém-se como referência de revisão enquanto o alojamento de destino está por concluir.
+
+Estado Cloudflare confirmado: a credencial permitiu registar o endereço de conta workers.dev em falta. A instalação parou depois com HTTP 401 ao aceder ao D1. Rever a permissão de conta D1: Edit e o âmbito da conta no token; não divulgar o valor. O Worker de orçamento ainda não está instalado nem operacional.

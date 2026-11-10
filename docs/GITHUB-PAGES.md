@@ -13,7 +13,7 @@ O endereço só deve ser apresentado como ativo depois de publicação concluíd
 3. Autorizar a aplicação GitHub a aceder ao repositório time-saver. Uma transferência de propriedade não concede esse acesso automaticamente.
 4. No GitHub, abrir https://github.com/timesaverautomate/time-saver/settings/pages e selecionar GitHub Actions como Source, se a conta e a visibilidade do repositório forem elegíveis.
 
-Concluído: a conta timesaverautomate foi ligada e o acesso administrativo ao repositório foi confirmado. O titular tornou o repositório público e ativou Pages com origem GitHub Actions. A API Pages respondeu 200; ainda sem domínio personalizado ou deploy concluído. Não é necessário repetir a associação nem partilhar palavras-passe ou chaves com o chat.
+Concluído: a conta timesaverautomate foi ligada e o acesso administrativo ao repositório foi confirmado. O titular tornou o repositório público e ativou Pages com origem GitHub Actions. A API Pages respondeu 200. O pré-lançamento foi publicado e verificado em https://timesaverautomate.github.io/time-saver/; o domínio personalizado ainda não está associado. Não é necessário repetir a associação nem partilhar palavras-passe ou chaves com o chat.
 
 ## Plano e visibilidade
 

@@ -19,5 +19,7 @@
   "publicationMode": "preview",
   "publicPreviewAuthorised": true,
   "githubPagesVerifiedURL": "https://timesaverautomate.github.io/time-saver/",
-  "githubPagesVerifiedCommit": "6a64a7d7c01528e0be88fc206d5a77d0e36ff626"
+  "githubPagesVerifiedCommit": "c6bd04c635a46441b31276339bb446827e4689ee",
+  "backendInstallationState": "blocked_d1_http_401",
+  "workersDevAccountRegistered": true
 }

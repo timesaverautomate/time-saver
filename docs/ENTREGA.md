@@ -2,7 +2,7 @@
 
 ## Estado atual
 
-O código está no repositório público timesaverautomate/time-saver. O titular ativou GitHub Pages com origem GitHub Actions; a configuração foi confirmada pela API. O frontend e o backend estão implementados, mas ainda falta a primeira publicação. O destinatário e o contacto de privacidade autorizados são timesaverautomate@gmail.com.
+O código está no repositório público timesaverautomate/time-saver. O titular ativou GitHub Pages com origem GitHub Actions; a configuração foi confirmada pela API. O frontend de pré-lançamento está publicado em https://timesaverautomate.github.io/time-saver/ e foi verificado por HTTPS (HTTP 200). O código do backend está implementado, mas a instalação ainda não está concluída. O destinatário e o contacto de privacidade autorizados são timesaverautomate@gmail.com.
 
 **O formulário ainda não envia pedidos.** O teste técnico isolado Resend foi recebido na caixa Gmail e confirmado pelo titular; a chave está em GitHub Actions Secrets. Isso não configura o backend. Faltam o remetente de domínio verificado, a instalação do Worker/D1 na Cloudflare, dados legais e os testes do formulário completo. As páginas legais contêm marcadores explícitos e o preflight bloqueia a publicação comercial.
 
@@ -152,3 +152,11 @@ Referências técnicas da instalação do backend:
 - https://developers.cloudflare.com/d1/wrangler-commands/
 - https://developers.cloudflare.com/workers/configuration/secrets/
 - https://developers.cloudflare.com/workers/ci-cd/external-cicd/
+
+## Resultado operacional mais recente
+
+- Publicação GitHub Pages concluída; recursos e rotas informativas responderam 200; /login respondeu 404.
+- Pré-lançamento sem formulário, campos de recolha, API ativa ou indexação. Não equivale à abertura comercial.
+- Endereço de conta workers.dev registado sem alterar planos. A instalação do Worker parou no acesso ao D1 (HTTP 401). Rever a permissão D1: Edit na conta correta.
+- timesaverautomate.com continua sem associação e DNS de destino verificados.
+- Dados legais, condições dos fornecedores, remetente de produção e testes completos do orçamento continuam pendentes.

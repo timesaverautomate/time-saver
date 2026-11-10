@@ -10,7 +10,7 @@ O acesso administrativo à nova conta/repositório GitHub foi confirmado. A inte
 
 As ações oficiais foram fixadas em SHAs completos de releases verificadas. Os checkouts não persistem credenciais. O teste Resend só corre em main. O job de publicação tem apenas as permissões Pages/OIDC necessárias. Pull requests públicos não recebem a chave Resend.
 
-A execução [42841836621](https://github.com/timesaverautomate/time-saver/actions/runs/42841836621) aprovou 31 testes e verificou 13 commits/68 blobs de texto sem encontrar os padrões procurados. Confirmou Pages não configurado/acessível (HTTP 404) e omitiu a publicação. O repositório continuava privado na leitura após esse workflow. Mais tarde, o titular alterou-o para público e ativou Pages: a nova consulta GET /repos/timesaverautomate/time-saver/pages respondeu HTTP 200, build_type workflow, cname null e https_enforced true. O endereço público do site ainda respondia 404; a publicação aguarda os dados legais. As consultas DNS à raiz e ao CNAME www continuavam sem registos de destino.
+A execução [42841836621](https://github.com/timesaverautomate/time-saver/actions/runs/42841836621) aprovou 31 testes e verificou 13 commits/68 blobs de texto sem encontrar os padrões procurados. Confirmou Pages não configurado/acessível (HTTP 404) e omitiu a publicação. O repositório continuava privado na leitura após esse workflow. Mais tarde, o titular alterou-o para público e ativou Pages: a nova consulta GET /repos/timesaverautomate/time-saver/pages respondeu HTTP 200, build_type workflow, cname null e https_enforced true. Essa verificação antecedeu a publicação. Posteriormente, o modo de pré-lançamento foi publicado com sucesso e GET https://timesaverautomate.github.io/time-saver/ respondeu 200 por HTTPS, sem formulário. O modo comercial aguarda os dados legais. As consultas DNS à raiz e ao CNAME www continuavam sem registos de destino.
 
 O workflow Pages verifica padrões de credenciais no histórico Git completo sem imprimir os valores. A auditoria é heurística; não garante ausência de todos os tipos de segredo. Existem testes que verificam deteção de uma credencial removida do ficheiro atual mas ainda presente no histórico.
 
@@ -87,3 +87,7 @@ Fontes:
 - https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site
 - https://resend.com/docs/dashboard/domains/introduction
 - https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits
+
+## Atualização verificada da instalação
+
+A execução 42849491105 publicou o pré-lançamento com sucesso. A execução Cloudflare 42849491178 registou o subdomínio de conta em falta e depois recebeu HTTP 401 na operação d1_database. A conta tem agora um endereço workers.dev, mas isso não significa que o Worker tenha sido instalado. Rever D1: Edit e o âmbito da conta na credencial; não publicar o valor. O domínio próprio e as regras Cloudflare continuam pendentes.
