@@ -1,4 +1,4 @@
-name: Verificar ligacao Sheets no Worker (diagnostico)
+name: Verificar ligacao Sheets no Worker (diagnostico tecnico)
 on:
   push:
     branches: [main]
