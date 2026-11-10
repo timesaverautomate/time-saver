@@ -30,13 +30,14 @@ test('proxy do domínio reescreve caminhos e metadados e aplica cabeçalhos sem 
   assert.match(response.headers.get('Content-Security-Policy'),/connect-src 'none';.*form-action 'none'; frame-ancestors 'none'/);
   for(const name of ['Set-Cookie','Access-Control-Allow-Origin','ETag'])assert.equal(response.headers.has(name),false);
 });
-test('proxy só aceita hosts e recursos previstos e nunca disponibiliza POST ou rotas de contas/API',async()=>{
+test('proxy só aceita hosts e recursos previstos, sem contas e sem POST para páginas',async()=>{
   let count=0;const fetcher=async()=>{count++;return upstream();};
-  for(const path of ['/api/quote','/login','/admin','/https://evil.test/','/README.md']) {
+  for(const path of ['/api/unknown','/login','/admin','/https://evil.test/','/README.md']) {
     assert.equal((await proxyFetch(new Request('https://'+DOMAIN+path),{},fetcher)).status,404);
   }
   assert.equal((await proxyFetch(new Request('https://evil.test/'),{},fetcher)).status,404);
   assert.equal((await proxyFetch(new Request('https://'+DOMAIN+'/',{method:'POST',body:'private'}),{},fetcher)).status,405);
+  assert.equal((await proxyFetch(new Request('https://'+DOMAIN+'/api/quote'),{},fetcher)).status,405);
   assert.equal(count,0);
 });
 test('proxy encaminha HTTP/www para HTTPS canónico e remove parâmetros sem os enviar à origem',async()=>{
@@ -70,10 +71,11 @@ test('proxy falha de forma fechada se a origem passar a incluir formulário ou d
   }
 });
 
-function deploymentFixture({settings=null,domains=[],dnsOccupied=false,certPending=false,rejectWWW=false}={}) {
+function deploymentFixture({settings=null,domains=[],dnsOccupied=false,certPending=false,rejectWWW=false,contact=false}={}) {
   const calls=[],uploads=[];let hsts=false;
   const env={GITHUB_REPOSITORY_ID:'1452563434',GITHUB_REPOSITORY:'timesaverautomate/time-saver',
     GITHUB_REF:'refs/heads/main',CLOUDFLARE_API_TOKEN:'unit-test-'.repeat(5)};
+  if(contact)Object.assign(env,{FORM_ENABLED:'true',RESEND_API_KEY:'re_test_only_deployment'});
   const json=result=>Response.json({success:true,result});
   const fetcher=async(url,options={})=>{
     calls.push({url,options});const parsed=new URL(url),path=parsed.pathname;
@@ -81,6 +83,7 @@ function deploymentFixture({settings=null,domains=[],dnsOccupied=false,certPendi
     if(parsed.hostname==='timesaverautomate.github.io')return upstream();
     if([DOMAIN,'www.'+DOMAIN].includes(parsed.hostname)) {
       if(certPending)throw Error('certificate_pending');
+      if(contact&&path==='/api/form-status')return Response.json({available:true,version:'direct-email-v1'});
       return proxyFetch(new Request(url),{HSTS_ENABLED:String(hsts)},async()=>upstream());
     }
     assert.equal(parsed.hostname,'api.cloudflare.com');
@@ -126,6 +129,18 @@ test('domínio recusa substituir Worker alheio, outro serviço ou DNS já ocupad
     const f=deploymentFixture(setup);const result=await deploySiteDomain(f.options);
     assert.equal(result.installed,false);assert.equal(f.calls.filter(c=>c.options.method==='PUT').length,0);
   }
+});
+test('envio direto instala apenas módulos, segredos e contadores, preservando a chave existente sem D1',async()=>{
+  const settings={bindings:[{type:'plain_text',name:'TIME_SAVER_REPOSITORY_ID',text:'1452563434'},
+    {type:'secret_text',name:'SECURITY_HMAC_KEY'},{type:'plain_text',name:'HSTS_ENABLED',text:'true'}]};
+  const f=deploymentFixture({settings,contact:true});
+  const result=await deploySiteDomain(f.options);assert.equal(result.contactApiConfigured,true);
+  const metadata=f.uploads[0];assert.deepEqual(metadata.keep_bindings,['secret_text']);
+  assert.equal(metadata.bindings.filter(b=>b.type==='ratelimit').length,3);
+  assert.equal(metadata.bindings.find(b=>b.name==='RESEND_API_KEY').type,'secret_text');
+  assert.equal(metadata.bindings.some(b=>b.name==='SECURITY_HMAC_KEY'),false);
+  assert.ok(metadata.bindings.every(b=>!['d1','kv_namespace','durable_object_namespace','queue'].includes(b.type)));
+  assert.ok(f.calls.every(c=>!/billing|subscriptions|d1\/database/.test(c.url)));
 });
 test('HSTS só é ativado após verificar HTTPS; certificado pendente ou www recusado nunca são sucesso',async()=>{
   const pending=deploymentFixture({certPending:true});

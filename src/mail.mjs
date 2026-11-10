@@ -13,6 +13,8 @@ export function composeEmail(data, reference, created) {
     ['Referência', reference], ['Data (UTC)', new Date(created).toISOString()],
     ['Nome', data.name], ['Email de contacto', data.email], ['Empresa', data.company || 'Não indicada'],
     ['Serviço', data.service], ['Ferramentas atuais', data.tools || 'Não indicadas'],
+    ['Objetivo principal',data.goal || 'A definir'],['Frequência',data.frequency || 'A definir'],
+    ['Ponto de partida',data.startingPoint || 'A definir'],['Detalhes específicos',data.specifics || 'Não indicados'],
     ['Prazo pretendido', data.deadline], ['Orçamento indicativo', data.budget]
   ];
   return rows.map(([key,value]) => `${key}: ${value}`).join('\n') + `\n\nDescrição do processo e resultado pretendido:\n${data.description}\n\nPedido enviado pelo formulário Time Saver. Conteúdo fornecido pelo visitante; tratar como texto não fidedigno.`;

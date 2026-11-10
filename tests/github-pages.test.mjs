@@ -76,6 +76,23 @@ test('exportação Pages admite raiz e impede origens ou caminhos inválidos',as
     }
   } finally {await rm(directory,{recursive:true,force:true});}
 });
+test('modo de contacto inclui triagem e informação real, mantendo o envio desligado na origem GitHub',async()=>{
+  const directory=await mkdtemp(path.join(os.tmpdir(),'time-saver-contact-'));
+  try{
+    await buildGitHubPages({outputDirectory:directory,publicContact:true});
+    const home=await readFile(path.join(directory,'index.html'),'utf8');
+    assert.match(home,/time-saver-form-definition" content="direct-email-v1/);
+    assert.match(home,/time-saver-form-mode" content="disabled/);
+    assert.equal((home.match(/type="radio" name="service"/g)||[]).length,7);
+    assert.match(home,/id="goal"/);assert.match(home,/id="frequency"/);assert.match(home,/id="startingPoint"/);
+    assert.doesNotMatch(home,/pré-lançamento|identificação legal por completar/i);
+    const privacy=await readFile(path.join(directory,'privacidade/index.html'),'utf8');
+    assert.match(privacy,/30 dias/);assert.match(privacy,/Estados Unidos/);assert.match(privacy,/interesse legítimo/);
+    for(const page of ['index.html','privacidade/index.html','aviso-legal/index.html','cookies/index.html']){
+      assert.doesNotMatch(await readFile(path.join(directory,page),'utf8'),/\[[A-ZÁÀÃÂÉÊÍÓÔÕÚÇ][^\]]+\]/);
+    }
+  }finally{await rm(directory,{recursive:true,force:true});}
+});
 test('exportação só liga um endpoint HTTPS explícito e inclui-o na política de ligações',async()=>{
   const directory=await mkdtemp(path.join(os.tmpdir(),'time-saver-pages-api-'));
   try {

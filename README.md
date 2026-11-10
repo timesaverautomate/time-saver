@@ -1,78 +1,52 @@
 # Time Saver
 
-Website profissional em português de Portugal para apresentar serviços de automação e receber pedidos de orçamento.
+Website em português de Portugal: **https://timesaverautomate.com/**. Código em **timesaverautomate/time-saver**, ficheiros no GitHub Pages e HTTPS, cabeçalhos e formulário no Worker Cloudflare `time-saver-edge`. A manutenção é feita pelo GitHub, sem instalar ficheiros no PC.
 
-**Site público:** https://timesaverautomate.com/ — domínio ligado e verificado por HTTPS (HTTP 200), com www/HTTP a encaminhar para o endereço principal. Ficheiros alojados no GitHub Pages e protegidos pelo Worker Cloudflare time-saver-edge. Sem formulário ou recolha de pedidos. Código e testes automáticos preparados; teste operacional Resend recebido e confirmado. O domínio próprio está ligado. Por decisão do titular, a apresentação continua sem formulário ou recolha comercial e sem dados legais inventados. Não se declara conformidade legal garantida. Nenhuma compra foi efetuada. Não são necessários ficheiros no seu PC para manter ou publicar este projeto.
+## Formulário de orçamento
 
-## Começar aqui
+Triagem em sete categorias: Excel/macros/VBA, automação de processos, dashboards/relatórios, tratamento de dados, integrações, aplicações à medida e “Ainda não sei”. As orientações adaptam-se à escolha. Nome, email e descrição são obrigatórios; os restantes detalhes são opcionais.
 
-O repositório foi transferido para **timesaverautomate/time-saver**. O domínio indicado é **timesaverautomate.com**, com DNS na Cloudflare. Consulte [o guia de GitHub Pages](docs/GITHUB-PAGES.md) e [a preparação do domínio e segurança](docs/DOMINIO-E-SEGURANCA.md).
+O Worker valida o pedido e envia **texto simples** pelo Resend, de `pedidos@timesaverautomate.com` para **timesaverautomate@gmail.com**. O email validado do visitante é usado apenas no Reply-To. Destinatário, remetente e assunto são fixos no servidor. Não há respostas automáticas.
 
-1. Leia [o guia de entrega e ativação](docs/ENTREGA.md): explica os passos pelo navegador, sem terminal no PC.
-2. Complete [a revisão de privacidade e operação](docs/PRIVACIDADE-E-OPERACAO.md).
-3. Consulte [as verificações realizadas e pendentes](docs/VALIDACAO.md).
-4. Para instalar o backend pelo GitHub, siga [a instalação automática na Cloudflare](docs/INSTALACAO-AUTOMATICA.md). O instalador mantém o envio desativado e requer uma credencial de gestão guardada diretamente em Actions Secrets.
+**Sem base de dados de pedidos, CRM ou folhas de cálculo ligados ao formulário.** Não são guardados corpos em logs da aplicação nem em armazenamento persistente do navegador. O Resend conserva conteúdo e registos durante 30 dias, conforme o fornecedor; esta utilização foi expressamente aceite pelo titular. A caixa Gmail conserva as mensagens recebidas. Consulte [o funcionamento e operação](docs/FORMULARIO-EMAIL.md).
 
-O destinatário indicado é **timesaverautomate@gmail.com**. É configurado exclusivamente no servidor. Falta verificar o domínio de envio e configurar no backend a credencial já guardada em GitHub Actions. Não é pedida a palavra-passe do Gmail.
+A implementação está preparada para publicar o formulário depois de verificar a API. O resultado dos testes reais e da receção é registado em [VALIDACAO.md](docs/VALIDACAO.md); não confundir uma resposta de aceitação do fornecedor com entrega na caixa de entrada.
 
-## O que inclui
+## Estrutura ativa
 
-- Landing page adaptável a telemóvel, tablet e computador.
-- Logótipo original em caminhos SVG e lettering vetorial da palavra “tempo”, mantendo texto acessível para leitores de ecrã.
-- Demonstração interativa de três processos, seis serviços, cinco exemplos ilustrativos, processo em quatro passos e perguntas frequentes.
-- Formulário com detalhes opcionais expansíveis, validação e estados de envio.
-- Backend Cloudflare Worker com envio real através da API Resend, apenas quando configurado.
-- Proteções partilhadas em D1 contra excesso de pedidos e duplicados. Sem base de dados de pedidos.
-- Política de Privacidade, Aviso Legal e informação sobre cookies para completar.
-- Sem contas, login, pagamentos, subscrições, newsletter, chatbot, anexos ou analítica.
-- Sem bibliotecas de produção nem recursos de terceiros no navegador.
-
-## Estrutura
-
-| Caminho | Conteúdo |
+| Caminho | Função |
 | --- | --- |
-| public/ | HTML, CSS, JavaScript e SVG locais |
-| src/worker.mjs | Rotas, validação de origem e submissão |
-| src/validation.mjs | Formatos, tipos, opções e limites |
-| src/mail.mjs | Configuração e envio de email exclusivamente no servidor |
-| src/security.mjs | Cabeçalhos, HMAC e códigos temporários |
-| src/store.mjs | Contadores e bloqueios atómicos em D1 |
-| migrations/ | Esquema técnico, sem nomes, emails ou mensagens |
-| scripts/build.mjs | Compilação determinística para um único Worker |
-| scripts/preflight.mjs | Bloqueio de publicação com marcadores legais |
-| tests/ | Testes Node com SQLite real e fornecedor de email substituído por um serviço de teste |
-| docs/ | Configuração, privacidade, operação e validação |
+| `public/` | Landing page, formulário, CSS, JavaScript e recursos locais |
+| `src/site-proxy.mjs` | Domínio público, cabeçalhos e acesso à origem GitHub |
+| `src/contact.mjs` | API de email sem persistência de pedidos |
+| `src/validation.mjs` | Validação de campos, opções e limites |
+| `src/security.mjs` | Funções criptográficas partilhadas |
+| `scripts/contact-html.mjs` | Informação publicada sobre privacidade e funcionamento |
+| `scripts/deploy-site-domain.mjs` | Instalação nativa do Worker, segredos e contadores |
+| `.github/workflows/site-domain.yml` | Publicação e verificação do Worker |
+| `.github/workflows/github-pages.yml` | Testes, auditoria e publicação de ficheiros no Pages |
+| `config/domain.json` | Configuração pública, sem segredos |
+| `tests/` | Validação, segurança, erros, idempotência e publicação |
 
-## Desenvolvimento técnico
+Os módulos antigos `src/worker.mjs`, `src/store.mjs`, `src/mail.mjs`, as migrações e o instalador antigo permanecem como referência técnica e para testes de regressão. **Não são usados pelo alojamento ativo.** O workflow antigo de instalação com D1 foi removido. O Worker ativo só recebe os quatro módulos indicados acima; não recebe qualquer ligação a D1, KV, Durable Objects ou filas.
 
-Requer Node.js 22.13 ou superior, recomendado Node 24. Não há dependências a instalar para construir ou testar:
+## Publicar e verificar
+
+Em GitHub → Actions, os workflows de domínio e Pages executam-se após alterações em `main`. O modo `contact` aguarda pela API antes de publicar os campos. A origem GitHub mantém o formulário desativado; só o domínio protegido o ativa. Não definir um domínio personalizado diretamente no GitHub Pages: a origem independente evita ciclos de redirecionamento.
+
+Segredos em GitHub → Settings → Secrets and variables → Actions: `RESEND_API_KEY` e `CLOUDFLARE_API_TOKEN` (ou `CLOUDFLARE_SITE_API_TOKEN`). Nunca os colocar no código. A chave HMAC é criada no servidor e preservada nas atualizações. Não há compras ou alterações de plano automáticas.
+
+Para verificar num ambiente de desenvolvimento na nuvem, com Node 24:
 
     npm run check
-    npm run build
-    npm run preflight
+    PAGES_PUBLIC_CONTACT=true npm run build:pages
 
-O preflight **falha intencionalmente na entrega**, porque faltam os dados legais. A sua aprovação não equivale a uma auditoria jurídica.
+## Segurança e limites
 
-A construção junta os módulos e os recursos de public/ em dist/server/index.js. O ficheiro de recursos importado em src/worker.mjs é resolvido pelo construtor; não execute esse módulo de origem diretamente.
+HTTPS, HSTS, CSP, antienquadramento, validação de origem e campos no servidor, limite de 16 KiB, honeypot, ticket assinado, limites nativos de submissão e idempotência do Resend. Sem login, registo, anexos, pagamentos, chatbot, analítica ou recursos externos no navegador. Os contadores Cloudflare são aproximados por localização; não constituem um limite mundial estrito. A idempotência protege a repetição da mesma tentativa durante a janela documentada; não identifica pedidos iguais iniciados em páginas novas.
 
-Para desenvolvimento num ambiente na nuvem, é possível usar Wrangler com um ambiente de teste e D1 local. Consulte primeiro as condições da ferramenta e da plataforma. Nunca coloque segredos no código ou no navegador.
+## Informação jurídica
 
-## Alojamento escolhido: GitHub Pages
+O titular pediu que não fossem publicados nome legal, NIF ou morada. Esses dados não foram inventados. As páginas publicadas descrevem o funcionamento e identificam o contacto de privacidade; **a identificação jurídica do prestador continua incompleta**. Não se declara conformidade garantida. As minutas com marcadores permanecem em `public/` para futura conclusão e não são publicadas no modo `contact`. O modo `production` e a indexação continuam bloqueados pelo preflight jurídico.
 
-O frontend está preparado para GitHub Pages, com recursos locais e caminhos adaptados ao projeto ou ao domínio personalizado. O domínio público verificado é https://timesaverautomate.com. A origem GitHub permanece independente em https://timesaverautomate.github.io/time-saver/, para ser consultada pelo Worker por HTTPS.
-
-    npm run build:pages
-
-O workflow de Pages constrói uma revisão, audita padrões de segredos no histórico e verifica a configuração de alojamento. A publicação comercial permanece bloqueada pelos marcadores legais. O modo explícito preview publica uma apresentação de pré-lançamento sem campos de recolha, sem os documentos legais incompletos e sem indexação; as minutas completas permanecem no código para revisão. O titular tornou o repositório público e ativou Pages com origem GitHub Actions, confirmado pela API. A publicação de pré-lançamento foi concluída com sucesso. O bloqueio de dados legais permanece ativo para o modo production.
-
-O backend é separado, porque GitHub Pages não executa funções de servidor. O Worker suporta API dedicada, CORS para a origem exata, validação, limites partilhados e proteção contra duplicados. Na exportação estática, o formulário permanece desativado até configurar um endpoint HTTPS real em QUOTE_API_ORIGIN e o backend confirmar disponibilidade. A chave Resend fica no servidor.
-
-As ações oficiais estão fixadas em SHAs completos. Os cabeçalhos do domínio foram aplicados pelo Worker e verificados em respostas reais: CSP, HSTS, antienquadramento, nosniff, política de referência e permissões, COOP e CORP. O controlo da aplicação rejeita TLS 1.0/1.1; não se afirma ter alterado a definição global da zona. O repositório público não contém os valores dos segredos de Actions.
-
-A versão privada antiga no Sites mantém-se como referência de revisão enquanto o alojamento de destino está por concluir.
-
-Backend de orçamento inativo: a credencial permitiu registar o endereço de conta workers.dev em falta. A instalação parou depois com HTTP 401 ao aceder ao D1. Rever a permissão de conta D1: Edit e o âmbito da conta no token; não divulgar o valor. O Worker de orçamento ainda não está instalado nem operacional.
-
-O titular optou por não fornecer dados legais. O site público mantém-se como apresentação de pré-lançamento, sem recolha de pedidos. A ligação do domínio e os controlos HTTP passam a usar o Worker time-saver-edge em frente à origem GitHub Pages; consultar [o procedimento do domínio público](docs/DOMINIO-PUBLICO.md). Este Worker não usa D1 ou Resend.
-
-**Validação do domínio concluída:** workflow 42853443010, commit 9ec9f07ac47da506187703546bb27f29b3967dfb. HTTPS, redirecionamentos e cabeçalhos verificados. 50 testes aprovados; origem e domínio sem formulário. O bloqueio D1 do backend de orçamento não afeta este site informativo. Consulte [o relatório](docs/VALIDACAO.md).
+Guias antigos de D1 ou pré-lançamento descrevem versões anteriores; para a configuração atual prevalecem este README e [FORMULARIO-EMAIL.md](docs/FORMULARIO-EMAIL.md).

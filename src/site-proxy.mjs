@@ -1,4 +1,5 @@
 // Ficheiros no GitHub Pages; este Worker protege apenas os dois hosts públicos.
+import { handleContact,contactConfigured } from './contact.mjs';
 const DOMAIN='timesaverautomate.com';
 const ORIGIN='https://timesaverautomate.github.io';
 const PREFIX='/time-saver/';
@@ -10,7 +11,8 @@ function protectedHeaders(env, upstream) {
   const headers=new Headers(upstream || {});
   for(const name of ['Set-Cookie','X-Powered-By','Access-Control-Allow-Origin',
     'Access-Control-Allow-Credentials','Report-To','Reporting-Endpoints','NEL']) headers.delete(name);
-  headers.set('Content-Security-Policy',POLICY);
+  const policy=contactConfigured(env)?POLICY.replace("connect-src 'none'","connect-src 'self'").replace("form-action 'none'","form-action 'self'"):POLICY;
+  headers.set('Content-Security-Policy',policy);
   headers.set('X-Frame-Options','DENY');
   headers.set('X-Content-Type-Options','nosniff');
   headers.set('Referrer-Policy','strict-origin-when-cross-origin');
@@ -35,9 +37,14 @@ export async function proxyFetch(request,env={},fetcher=globalThis.fetch) {
   try {
     const url=new URL(request.url);
     if(![DOMAIN,'www.'+DOMAIN].includes(url.hostname)) return message('Página não encontrada.',404,env);
-    if(!['GET','HEAD'].includes(request.method)) return message('Método não permitido.',405,env,{'Allow':'GET, HEAD'});
     const tls=request.cf?.tlsVersion;
     if(tls && /^TLSv?1(?:\.0|\.1)?$/i.test(tls)) return message('Utilize um navegador com TLS 1.2 ou superior.',426,env);
+    if(url.pathname.startsWith('/api/')){
+      if(url.protocol!=='https:'||url.hostname!==DOMAIN||url.search)return message('Origem não permitida.',403,env);
+      const response=await handleContact(request,env,fetcher);
+      return new Response(response.body,{status:response.status,headers:protectedHeaders(env,response.headers)});
+    }
+    if(!['GET','HEAD'].includes(request.method)) return message('Método não permitido.',405,env,{'Allow':'GET, HEAD'});
     let pathname=url.pathname;
     if(pathname==='/time-saver' || pathname==='/time-saver/') pathname='/';
     else if(pathname.startsWith(PREFIX)) pathname='/'+pathname.slice(PREFIX.length);
@@ -67,11 +74,12 @@ export async function proxyFetch(request,env={},fetcher=globalThis.fetch) {
     let body=upstream.body;
     if(upstream.headers.get('Content-Type')?.includes('text/html')) {
       let html=await upstream.text();
-      // Este domínio só apresenta o pré-lançamento: nunca expor acidentalmente um formulário.
-      if(!/name="time-saver-form-mode" content="disabled"/.test(html)
-        || /<(?:form|input|textarea|select)\b/i.test(html)) {
+      const knownContact=/name="time-saver-form-definition" content="direct-email-v1"/.test(html);
+      const hasFields=/<(?:form|input|textarea|select)\b/i.test(html);
+      if(!/name="time-saver-form-mode" content="disabled"/.test(html) || hasFields&&!knownContact) {
         return message('O site está em atualização. Tente novamente mais tarde.',503,env);
       }
+      if(knownContact&&contactConfigured(env))html=html.replace('name="time-saver-form-mode" content="disabled"','name="time-saver-form-mode" content="backend"');
       html=html.replaceAll(ORIGIN+PREFIX,'https://'+DOMAIN+'/')
         .replaceAll('="'+PREFIX,'="/');
       for(const name of ['Content-Length','Content-Encoding','ETag','Last-Modified']) headers.delete(name);

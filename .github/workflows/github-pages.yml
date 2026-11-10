@@ -5,8 +5,8 @@ on:
       publication:
         description: Modo de publicação
         type: choice
-        default: preview
-        options: [preview, production]
+        default: contact
+        options: [contact, preview, production]
   push:
     branches: [main]
 permissions: {}
@@ -87,12 +87,16 @@ jobs:
       - name: Obter configuração Pages
         id: pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Confirmar disponibilidade antes de publicar o formulário
+        if: steps.publication.outputs.contact == 'true'
+        run: node scripts/ensure-contact-api.mjs
       - name: Construir publicação
         env:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           PAGES_ORIGIN: ${{ steps.pages.outputs.origin }}
           PAGES_INDEXABLE: ${{ steps.publication.outputs.indexable }}
           PAGES_PUBLIC_PREVIEW: ${{ steps.publication.outputs.preview }}
+          PAGES_PUBLIC_CONTACT: ${{ steps.publication.outputs.contact }}
           PAGES_QUOTE_API_ORIGIN: ${{ vars.QUOTE_API_ORIGIN }}
         run: npm run build:pages
       - name: Preparar ficheiros de publicação

@@ -1,22 +1,41 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "time-saver",
-  "main": "dist/server/index.js",
+  "name": "time-saver-edge",
+  "main": "src/site-proxy.mjs",
   "compatibility_date": "2026-11-01",
-  "workers_dev": true,
-  "observability": { "enabled": false },
-  "vars": {
-    "MAIL_ENABLED": "false",
-    "LEGAL_READY": "false",
-    "PUBLIC_ORIGIN": "https://timesaverautomate.com",
-    "API_ONLY": "true",
-    "HSTS_ENABLED": "false"
+  "workers_dev": false,
+  "observability": {
+    "enabled": false
   },
-  "d1_databases": [{
-    "binding": "DB",
-    "database_name": "time-saver-security",
-    "database_id": "SUBSTITUIR_PELO_ID_D1",
-    "migrations_dir": "migrations"
-  }],
-  "triggers": { "crons": ["17 * * * *"] }
+  "vars": {
+    "FORM_ENABLED": "false",
+    "HSTS_ENABLED": "true",
+    "TIME_SAVER_REPOSITORY_ID": "1452563434"
+  },
+  "ratelimits": [
+    {
+      "name": "FORM_IP_RATE",
+      "namespace_id": "1452563434",
+      "simple": {
+        "limit": 5,
+        "period": 60
+      }
+    },
+    {
+      "name": "FORM_EDGE_RATE",
+      "namespace_id": "1452563435",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "FORM_TOKEN_RATE",
+      "namespace_id": "1452563436",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    }
+  ]
 }

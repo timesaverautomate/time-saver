@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir, readdir, rm, copyFile } from 'node:fs/promi
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { previewHTML } from './preview-html.mjs';
+import { contactHTML } from './contact-html.mjs';
 
 const root = path.resolve(import.meta.dirname,'..');
 const legalRoutes = new Set(['privacidade','aviso-legal','cookies']);
@@ -14,8 +15,11 @@ export async function buildGitHubPages({
   origin = 'https://timesaverautomate.github.io',
   indexable = false,
   apiOrigin = '',
-  publicPreview = false
+  publicPreview = false,
+  publicContact = false
 } = {}) {
+  if(publicContact&&publicPreview)throw new Error('Modos de publicação incompatíveis.');
+  if(publicContact){indexable=false;apiOrigin='';}
   if (publicPreview) { indexable=false; apiOrigin=''; }
   if (!/^\/(?:[A-Za-z0-9._-]+\/)*$/.test(basePath) || basePath.split('/').some(part=>part === '.' || part === '..')) throw new Error('Caminho base inválido.');
   const siteOrigin = new URL(origin);
@@ -41,6 +45,7 @@ export async function buildGitHubPages({
     let html = await readFile(path.join(sourcePath,file.name),'utf8');
     const name = file.name.slice(0,-5);
     if (publicPreview) html=previewHTML(name,html);
+    if (publicContact) html=contactHTML(name,html);
     const route = name === 'index' ? '' : legalRoutes.has(name) ? name+'/' : file.name;
     const canonical = origin+basePath+route;
     html = html.replace(/\b(href|src)="\/(?!\/)([^"]*)"/g,(_match,attribute,target)=>{
@@ -56,14 +61,18 @@ export async function buildGitHubPages({
       '<meta name="referrer" content="strict-origin-when-cross-origin">',
       '<meta name="time-saver-form-mode" content="'+(apiOrigin ? 'backend' : 'disabled')+'">',
       '<meta name="time-saver-api-origin" content="'+apiOrigin+'">',
+      ...(publicContact?['<meta name="time-saver-form-definition" content="direct-email-v1">']:[]),
       '<meta name="robots" content="'+(indexable ? 'index,follow' : 'noindex,nofollow')+'">',
       '<link rel="canonical" href="'+canonical+'">',
       '<meta property="og:url" content="'+canonical+'">'
     ].join('\n');
     html = html.replace(/(<meta charset="utf-8">)/,'$1\n'+metadata);
-    html = html.replace('A verificar a disponibilidade do formulário…','O formulário ainda não está disponível. O envio de pedidos está temporariamente desativado.');
-    html = html.replace('Ative o JavaScript para validar e enviar este formulário. Os seus dados não foram enviados.','O envio de pedidos está temporariamente desativado.');
+    if(!publicContact){
+      html = html.replace('A verificar a disponibilidade do formulário…','O formulário ainda não está disponível. O envio de pedidos está temporariamente desativado.');
+      html = html.replace('Ative o JavaScript para validar e enviar este formulário. Os seus dados não foram enviados.','O envio de pedidos está temporariamente desativado.');
+    }
     if (publicPreview && /\[[A-ZÁÀÃÂÉÊÍÓÔÕÚÇ][^\]]+\]|<form\b/.test(html)) throw new Error('Pré-lançamento contém marcadores ou formulário.');
+    if(publicContact&&/\[[A-ZÁÀÃÂÉÊÍÓÔÕÚÇ][^\]]+\]/.test(html))throw new Error('Apresentação contém marcadores por preencher.');
     const destination = legalRoutes.has(name) ? path.join(outputPath,name,'index.html') : path.join(outputPath,file.name);
     await mkdir(path.dirname(destination),{recursive:true});
     await writeFile(destination,html);
@@ -71,7 +80,7 @@ export async function buildGitHubPages({
   }
   await writeFile(path.join(outputPath,'.nojekyll'),'');
   await writeFile(path.join(outputPath,'robots.txt'),'User-agent: *\n'+(indexable ? 'Allow: '+basePath : 'Disallow: /')+'\n');
-  return {directory:outputPath,expectedURL:origin+basePath,resources:count,indexable,backendConfigured:Boolean(apiOrigin),publicPreview,formAvailability:publicPreview ? 'Sem formulário nesta versão de pré-lançamento.' : 'Confirmada apenas pelo backend, nunca pela construção estática.'};
+  return {directory:outputPath,expectedURL:origin+basePath,resources:count,indexable,backendConfigured:Boolean(apiOrigin),publicPreview,publicContact,formAvailability:publicPreview ? 'Sem formulário nesta versão de pré-lançamento.' : 'Confirmada apenas pelo backend, nunca pela construção estática.'};
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -83,7 +92,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     origin:process.env.PAGES_ORIGIN || 'https://timesaverautomate.github.io',
     indexable:process.env.PAGES_INDEXABLE === 'true',
     apiOrigin:process.env.PAGES_QUOTE_API_ORIGIN || '',
-    publicPreview:process.env.PAGES_PUBLIC_PREVIEW === 'true'
+    publicPreview:process.env.PAGES_PUBLIC_PREVIEW === 'true',
+    publicContact:process.env.PAGES_PUBLIC_CONTACT === 'true'
   });
   console.log(JSON.stringify(result,null,2));
 }

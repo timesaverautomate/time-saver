@@ -1,4 +1,7 @@
-export const SERVICE_OPTIONS = ['Ainda não sei', 'Excel', 'VBA', 'Aplicação à medida', 'Integração entre ferramentas', 'Outro'];
+export const SERVICE_OPTIONS = ['Ainda não sei', 'Excel', 'VBA', 'Excel, macros e VBA', 'Automação de processos', 'Dashboards e relatórios', 'Tratamento de dados', 'Aplicação à medida', 'Integração entre ferramentas', 'Outro'];
+export const GOAL_OPTIONS = ['A definir','Poupar tempo','Reduzir erros','Melhorar a informação de gestão','Ligar ferramentas','Organizar e acompanhar processos','Outro'];
+export const FREQUENCY_OPTIONS = ['A definir','Várias vezes por dia','Diariamente','Semanalmente','Mensalmente','Pontualmente'];
+export const STARTING_POINT_OPTIONS = ['A definir','Já existe um ficheiro ou processo','Melhorar uma solução existente','Criar de raiz'];
 export const BUDGET_OPTIONS = ['A definir', 'Até 500 €', '500 € a 1 500 €', '1 500 € a 5 000 €', 'Mais de 5 000 €'];
 export const DEADLINE_OPTIONS = ['A definir', 'Assim que possível', 'No próximo mês', 'Nos próximos 3 meses', 'Sem prazo definido'];
 export const MAX_BODY = 16_384;
@@ -12,9 +15,9 @@ export function validateSubmission(input) {
   const errors = {};
   const data = {};
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { errors: { form: 'Pedido inválido.' }, data };
-  const allowed = new Set(['name','email','description','company','service','tools','deadline','budget','website','token']);
+  const allowed = new Set(['name','email','description','company','service','tools','deadline','budget','website','token','goal','frequency','startingPoint','specifics']);
   if (Object.keys(input).some(key => !allowed.has(key))) errors.form = 'O pedido contém campos não permitidos.';
-  const fields = { name: [2, 100], email: [3, 254], description: [30, 4000], company: [0, 160], tools: [0, 500], website: [0, 200], token: [0, 600] };
+  const fields = { name: [2, 100], email: [3, 254], description: [30, 4000], company: [0, 160], tools: [0, 500], specifics:[0,500], website: [0, 200], token: [0, 600] };
   for (const [field, [min,max]] of Object.entries(fields)) {
     const raw = input[field] ?? '';
     if (typeof raw !== 'string') { errors[field] = 'Utilize texto neste campo.'; continue; }
@@ -25,7 +28,7 @@ export function validateSubmission(input) {
     if (['name','email','company'].includes(field) && /[\r\n]/.test(value)) errors[field] = 'Utilize uma única linha.';
   }
   if (!validEmail(data.email)) errors.email = 'Indique um email válido, por exemplo nome@empresa.pt.';
-  for (const [field, options] of [['service', SERVICE_OPTIONS], ['budget', BUDGET_OPTIONS], ['deadline', DEADLINE_OPTIONS]]) {
+  for (const [field, options] of [['service', SERVICE_OPTIONS], ['budget', BUDGET_OPTIONS], ['deadline', DEADLINE_OPTIONS],['goal',GOAL_OPTIONS],['frequency',FREQUENCY_OPTIONS],['startingPoint',STARTING_POINT_OPTIONS]]) {
     const value = input[field] ?? options[0];
     if (typeof value !== 'string' || !options.includes(value)) errors[field] = 'Selecione uma das opções disponíveis.';
     else data[field] = value;

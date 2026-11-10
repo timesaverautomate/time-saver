@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
 
 const DOMAIN='timesaverautomate.com';
 const HOSTS=[DOMAIN,'www.'+DOMAIN];
@@ -10,7 +11,7 @@ class DomainError extends Error {
 }
 function requireDomain(value,code){if(!value)throw new DomainError(code);}
 
-export async function deploySiteDomain({env,source,fetcher=fetch,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),attempts=24}) {
+export async function deploySiteDomain({env,source,modules={},fetcher=fetch,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),attempts=24,mask=()=>{}}) {
   const attached=[];let installed=false;
   try {
     requireDomain(env.GITHUB_REPOSITORY_ID===PROJECT && env.GITHUB_REPOSITORY==='timesaverautomate/time-saver'
@@ -18,6 +19,8 @@ export async function deploySiteDomain({env,source,fetcher=fetch,sleep=ms=>new P
     requireDomain(typeof env.CLOUDFLARE_API_TOKEN==='string' && env.CLOUDFLARE_API_TOKEN.length>=20
       && env.CLOUDFLARE_API_TOKEN.length<=512 && !/[\s\x00-\x1f\x7f]/.test(env.CLOUDFLARE_API_TOKEN),'missing_cloudflare_token');
     requireDomain(typeof source==='string' && source.includes('timesaverautomate.github.io'),'invalid_proxy_source');
+    const formRequested=env.FORM_ENABLED==='true';
+    if(formRequested)requireDomain(/^re_[A-Za-z0-9_-]{8,256}$/.test(env.RESEND_API_KEY||''),'missing_resend_key');
     async function cf(endpoint,{method='GET',body,notFound=false,operation='cloudflare_request'}={}) {
       const headers={Authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN};
       if(body!==undefined && !(body instanceof FormData)) headers['Content-Type']='application/json';
@@ -61,17 +64,34 @@ export async function deploySiteDomain({env,source,fetcher=fetch,sleep=ms=>new P
       redirect:'error',signal:AbortSignal.timeout(15_000)});
     requireDomain(origin.status===200,'github_origin_unavailable');
     const html=await origin.text();
+    const definedContact=html.includes('name="time-saver-form-definition" content="direct-email-v1"');
     requireDomain(html.includes('name="time-saver-form-mode" content="disabled"')
-      && !/<(?:form|input|textarea|select)\b/i.test(html),'origin_is_not_public_preview');
+      && (!/<(?:form|input|textarea|select)\b/i.test(html)||formRequested&&definedContact),'origin_is_not_public_preview');
     let hsts=settings?.bindings?.some(b=>b.name==='HSTS_ENABLED' && b.type==='plain_text' && b.text==='true') || false;
+    let hmac='';
+    if(formRequested&&!settings?.bindings?.some(b=>b.type==='secret_text'&&b.name==='SECURITY_HMAC_KEY')){
+      hmac=randomBytes(32).toString('hex');mask(hmac);
+    }
     async function upload() {
       const form=new FormData();
+      const bindings=[{type:'plain_text',name:'TIME_SAVER_REPOSITORY_ID',text:PROJECT},
+        {type:'plain_text',name:'HSTS_ENABLED',text:String(hsts)},
+        {type:'plain_text',name:'FORM_ENABLED',text:String(formRequested)}];
+      if(formRequested){
+        bindings.push({type:'secret_text',name:'RESEND_API_KEY',text:env.RESEND_API_KEY});
+        if(hmac)bindings.push({type:'secret_text',name:'SECURITY_HMAC_KEY',text:hmac});
+        bindings.push(...[
+          ['FORM_IP_RATE','1452563434',5],['FORM_EDGE_RATE','1452563435',30],['FORM_TOKEN_RATE','1452563436',30]
+        ].map(([name,namespace_id,limit])=>({type:'ratelimit',name,namespace_id,simple:{limit,period:60}})));
+      }
       form.set('metadata',new Blob([JSON.stringify({main_module:'proxy.mjs',compatibility_date:'2026-11-01',
-        observability:{enabled:false},bindings:[
-          {type:'plain_text',name:'TIME_SAVER_REPOSITORY_ID',text:PROJECT},
-          {type:'plain_text',name:'HSTS_ENABLED',text:String(hsts)}
-        ]})],{type:'application/json'}),'metadata.json');
+        observability:{enabled:false},keep_bindings:['secret_text'],bindings})],{type:'application/json'}),'metadata.json');
       form.set('proxy.mjs',new Blob([source],{type:'application/javascript+module'}),'proxy.mjs');
+      for(const [name,contents] of Object.entries(modules)){
+        if(name==='proxy.mjs')continue;
+        requireDomain(['contact.mjs','validation.mjs','security.mjs'].includes(name),'unexpected_worker_module');
+        form.set(name,new Blob([contents],{type:'application/javascript+module'}),name);
+      }
       await cf(base+'/workers/scripts/'+WORKER,{method:'PUT',body:form,operation:'worker_upload'});
       installed=true;
     }
@@ -90,8 +110,12 @@ export async function deploySiteDomain({env,source,fetcher=fetch,sleep=ms=>new P
         const body=await root.text();
         if(root.status!==200 || root.headers.get('X-Time-Saver-Edge')!=='1'
           || !root.headers.get('Content-Security-Policy')?.includes("frame-ancestors 'none'")
-          || /<(?:form|input|textarea|select)\b/i.test(body) || body.includes('="/time-saver/')
+          || (!formRequested&&/<(?:form|input|textarea|select)\b/i.test(body)) || body.includes('="/time-saver/')
           || (expectHsts && root.headers.get('Strict-Transport-Security')!=='max-age=31536000'))return false;
+        if(formRequested){
+          const status=await fetcher('https://'+DOMAIN+'/api/form-status',{redirect:'manual',headers:{Origin:'https://'+DOMAIN},signal:AbortSignal.timeout(15_000)});
+          const info=await status.json();if(!status.ok||info.available!==true||info.version!=='direct-email-v1')return false;
+        }
         const www=await fetcher('https://www.'+DOMAIN+'/',{redirect:'manual',signal:AbortSignal.timeout(15_000)});
         return www.status===308 && www.headers.get('Location')==='https://'+DOMAIN+'/';
       }catch{return false;}
@@ -108,10 +132,18 @@ export async function deploySiteDomain({env,source,fetcher=fetch,sleep=ms=>new P
       if(await verify(true)){verified=true;break;}
       if(i<5)await sleep(2_000);
     }
-    return {configured:true,verified,installed,attached,code:verified?'domain_and_security_verified':'hsts_verification_pending'};
+    return {configured:true,verified,installed,attached,contactApiConfigured:formRequested&&verified,
+      code:verified?(formRequested?'domain_and_contact_api_verified':'domain_and_security_verified'):'hsts_verification_pending'};
   }catch(error){return {configured:attached.length>0,verified:false,installed,attached,
     code:error instanceof DomainError?error.code:'domain_setup_failed',
     ...(error instanceof DomainError && error.httpStatus ? {httpStatus:error.httpStatus,operation:error.operation}:{} )};}
 }
 
 export async function readProxySource(){return readFile(new URL('../src/site-proxy.mjs',import.meta.url),'utf8');}
+export async function readSiteModules(){
+  const modules={};
+  for(const [name,file] of [['proxy.mjs','site-proxy.mjs'],['contact.mjs','contact.mjs'],['validation.mjs','validation.mjs'],['security.mjs','security.mjs']]){
+    modules[name]=await readFile(new URL('../src/'+file,import.meta.url),'utf8');
+  }
+  return modules;
+}

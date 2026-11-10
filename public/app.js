@@ -76,23 +76,47 @@ if (form) {
   let submissionKey = '', lastSignature = '';
   let tokenReadyTimer;
   const originalLabel = submitLabel.textContent;
-  const limits = {name:[2,100],email:[3,254],description:[30,4000],company:[0,160],tools:[0,500]};
-  const labels = {name:'Nome',email:'Email de contacto',description:'Descrição do processo',company:'Empresa',tools:'Ferramentas',service:'Tipo de serviço',budget:'Orçamento',deadline:'Prazo'};
+  const limits = {name:[2,100],email:[3,254],description:[30,4000],company:[0,160],tools:[0,500],specifics:[0,500]};
+  const labels = {name:'Nome',email:'Email de contacto',description:'Descrição do processo',company:'Empresa',tools:'Ferramentas',service:'Tipo de ajuda',budget:'Orçamento',deadline:'Prazo',goal:'Objetivo',frequency:'Frequência',startingPoint:'Ponto de partida',specifics:'Detalhes'};
+  const context = {
+    'Excel, macros e VBA':['Que ficheiros utiliza, o que faz manualmente e o que gostaria de automatizar?','Por exemplo: juntamos vários ficheiros Excel todos os meses e repetimos cálculos e formatações. Queremos preparar tudo num único passo.','Há regras ou cálculos importantes?'],
+    'Automação de processos':['Descreva os passos da tarefa, quem intervém e onde costuma haver repetição.','Por exemplo: copiamos pedidos recebidos por email para uma folha e depois enviamos avisos à equipa. Queremos reduzir estes passos manuais.','Que passos são hoje feitos manualmente?'],
+    'Dashboards e relatórios':['Diga de onde vêm os dados, que indicadores precisa de acompanhar e com que frequência.','Por exemplo: queremos reunir vendas e despesas num painel atualizado a partir dos ficheiros existentes, sem refazer o relatório todos os meses.','Que indicadores quer acompanhar?'],
+    'Tratamento de dados':['Explique onde está a informação e o que precisa de reunir, corrigir ou organizar.','Por exemplo: temos listas em vários ficheiros, com formatos diferentes e registos repetidos. Queremos uma base organizada para trabalhar.','Que problemas existem nos dados?'],
+    'Integração entre ferramentas':['Indique as ferramentas e a informação que precisa de passar entre elas.','Por exemplo: os pedidos entram numa ferramenta e são copiados para outra. Gostaríamos de evitar introduzir os mesmos dados duas vezes.','Que informação deve passar de uma ferramenta para outra?'],
+    'Aplicação à medida':['Descreva o processo que a aplicação deve apoiar e as principais ações dos utilizadores.','Por exemplo: queremos uma ferramenta interna para registar pedidos, acompanhar estados e consultar a informação num único local.','O que deve ser possível fazer na aplicação?'],
+    'Ainda não sei':['Conte-nos o que faz hoje, o que está a dar trabalho e o que gostaria de melhorar.','Por exemplo: todos os meses repetimos vários passos para preparar informação para a equipa. Gostaríamos de simplificar o processo e reduzir erros.','Há algum detalhe que ajude a perceber a necessidade?']
+  };
+  const fieldNodes = name => Array.from(form.querySelectorAll('[name="'+name+'"]'));
+  function focusField(name) {
+    const fields=fieldNodes(name); (fields.find(field=>field.checked)||fields[0])?.focus();
+  }
+  function updateServiceContext() {
+    const values=context[form.elements.service.value]||context['Ainda não sei'];
+    const guidance=document.querySelector('#service-guidance');
+    if(guidance)guidance.textContent=values[0];
+    description.placeholder=values[1];
+    const label=document.querySelector('#specifics-label');if(label)label.textContent=values[2];
+  }
+  fieldNodes('service').forEach(field=>field.addEventListener('change',updateServiceContext));
+  updateServiceContext();
   function updateCounter() {
     document.querySelector('#description-count').textContent = description.value.length.toLocaleString('pt-PT') + ' / 4 000';
   }
   description.addEventListener('input',updateCounter);
   function setFieldError(name,message) {
-    const input = form.elements[name];
+    const inputs = fieldNodes(name);
     const error = document.getElementById(name+'-error');
-    if (!input || !error) return;
-    input.setAttribute('aria-invalid',String(Boolean(message)));
+    if (!inputs.length || !error) return;
+    inputs.forEach(input=>input.setAttribute('aria-invalid',String(Boolean(message))));
     error.textContent = message || '';
-    if (message && input.closest('.optional-details')) input.closest('.optional-details').open = true;
+    if (message && inputs[0].closest('.optional-details')) inputs[0].closest('.optional-details').open = true;
   }
   Object.keys(labels).forEach(name=>{
-    form.elements[name]?.addEventListener('input',()=>setFieldError(name,''));
-    form.elements[name]?.addEventListener('change',()=>setFieldError(name,''));
+    fieldNodes(name).forEach(input=>{
+      input.addEventListener('input',()=>setFieldError(name,''));
+      input.addEventListener('change',()=>setFieldError(name,''));
+    });
   });
   function showMessage(message,success=false) {
     result.replaceChildren();
@@ -110,9 +134,9 @@ if (form) {
       const item = document.createElement('li');
       const anchor = document.createElement('a');
       if (form.elements[name]) {
-        anchor.href = '#'+name;
+        anchor.href = '#'+(fieldNodes(name)[0]?.id||name);
         anchor.textContent = (labels[name] || name)+': '+message;
-        anchor.addEventListener('click',event=>{event.preventDefault();form.elements[name].focus();});
+        anchor.addEventListener('click',event=>{event.preventDefault();focusField(name);});
         item.append(anchor);
       } else item.textContent = message;
       list.append(item);
@@ -145,7 +169,7 @@ if (form) {
   }
   function collect() {
     const data = {};
-    ['name','email','description','company','service','tools','deadline','budget','website'].forEach(name=>{data[name]=form.elements[name].value.trim().normalize('NFC');});
+    ['name','email','description','company','service','tools','deadline','budget','website','goal','frequency','startingPoint','specifics'].forEach(name=>{data[name]=(form.elements[name]?.value||'').trim().normalize('NFC');});
     return data;
   }
   function validate(data) {
@@ -182,6 +206,9 @@ if (form) {
         sent = true;
         showMessage('O seu pedido foi aceite para envio. Referência: '+payload.reference+'. Esta confirmação indica aceitação pelo serviço de email; não confirma a entrega na caixa de entrada.',true);
         submitLabel.textContent = 'Pedido aceite para envio';
+        form.reset();updateCounter();updateServiceContext();
+        lastSignature='';submissionKey='';token='';
+        const another=document.querySelector('#new-request');if(another)another.hidden=false;
       } else if (payload.errors) showErrors(payload.errors);
       else {
         showMessage(payload.message || 'Não foi possível confirmar o envio. Os dados foram mantidos; tente novamente.');
@@ -195,6 +222,11 @@ if (form) {
       submit.disabled = !available || sent;
       if (!sent) submitLabel.textContent = originalLabel;
     }
+  });
+  document.querySelector('#new-request')?.addEventListener('click',async()=>{
+    sent=false;submissionKey='';lastSignature='';token='';result.replaceChildren();
+    document.querySelector('#new-request').hidden=true;submitLabel.textContent=originalLabel;
+    await refreshToken();focusField('service');
   });
   refreshToken();
 }
