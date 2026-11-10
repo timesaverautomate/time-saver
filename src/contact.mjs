@@ -1,6 +1,6 @@
 import { validateSubmission,readBoundedJSON,BodyTimeoutError } from './validation.mjs';
 import { keyedHash,sameDigest } from './security.mjs';
-import { storeQuote,markQuoteReceived } from './quote-sheets.mjs';
+import { storeQuote,markQuoteReceived,verifyQuoteSheet } from './quote-sheets.mjs';
 
 const CONTACT_ORIGIN='https://timesaverautomate.com';
 const CONTACT_TO='timesaverautomate@gmail.com';
@@ -77,6 +77,16 @@ export async function parseContactToken(token,env,now=Date.now()){
 }
 export async function handleContact(request,env,transport=fetch){
   const path=new URL(request.url).pathname;
+  if(path==='/api/quote-crm-health'){
+    if(request.method!=='GET'||!contactOrigin(request,false))return contactJSON({ready:false},403);
+    try{
+      await verifyQuoteSheet(env);
+      return contactJSON({ready:true});
+    }catch(error){
+      const known=/^sheets_[a-z0-9_]+$/.test(error?.message||'')?error.message:'sheets_runtime_error';
+      return contactJSON({ready:false,code:known});
+    }
+  }
   if(!['/api/form-status','/api/quote'].includes(path))return contactJSON({message:'Página não encontrada.'},404);
   const method=path==='/api/form-status'?'GET':'POST';
   if(request.method!==method)return contactJSON({message:'Método não permitido.'},405,{Allow:method});
