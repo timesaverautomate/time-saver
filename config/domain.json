@@ -25,7 +25,7 @@
   "domainDelivery": "github-pages-origin-cloudflare-worker",
   "edgeWorker": "time-saver-edge",
   "quoteCollectionEnabled": true,
-  "quoteSheetSyncEnabled": true,
+  "quoteSheetSyncEnabled": false,
   "legalDataDeclinedByOwner": true,
   "domainSecurityVerified": true,
   "domainVerifiedCommit": "9ec9f07ac47da506187703546bb27f29b3967dfb",
