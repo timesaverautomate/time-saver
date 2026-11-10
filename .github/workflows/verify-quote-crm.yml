@@ -1,0 +1,23 @@
+name: Testar integracao formulario CRM (interno)
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify-quote-crm.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  teste:
+    if: github.repository_id == '1452563434' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[quote-crm-test]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Confirmar pedido interno no formulario e no CRM
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: node scripts/test-live-quote-crm.mjs
