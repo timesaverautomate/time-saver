@@ -247,24 +247,44 @@ def find_candidates(existing, limit):
     return candidates
 
 
-def write_test(credentials, candidates):
-    if not candidates:
-        raise RuntimeError("Nenhum candidato novo; teste de escrita não executado.")
-    # Releitura imediatamente antes de escrever para evitar duplicados.
-    latest = read_rows(credentials)
+def prepare_rows_for_write(latest, candidates, limit, day=None):
+    """Revalidar duplicados, bloqueios e quota antes de qualquer escrita."""
+    if day:
+        limit = min(limit, daily_remaining(latest, day))
+    if limit <= 0:
+        return []
     keys = existing_keys(latest)
     fresh = []
-    for row in candidates:
-        if not is_duplicate(row, keys):
-            fresh.append(row)
-            mark_seen(row, keys)
-        if len(fresh) >= MAX_TEST_WRITES:
+    for source in candidates:
+        row = list(source)
+        if is_duplicate(row, keys):
+            continue
+        if len(row) != 26 or row[24] != "Sim" or row[23] != "Por avaliar":
+            raise RuntimeError("Proteções de contacto em falta: escrita recusada.")
+        if any(row[i] for i in range(17, 23)):
+            raise RuntimeError("Campos de email devem permanecer vazios.")
+        if day:
+            row[16] = "OSM público; dados por verificar; " + AUTO_MARKER + day
+        fresh.append(row)
+        mark_seen(row, keys)
+        if len(fresh) >= limit:
             break
+    return fresh
+
+
+def write_candidates(credentials, candidates, limit, mode, day=None):
+    if not candidates:
+        if mode == "diario":
+            print("Sem novos candidatos elegíveis. Zero escritas.")
+            return 0
+        raise RuntimeError("Nenhum candidato novo; teste de escrita não executado.")
+    latest = read_rows(credentials)
+    fresh = prepare_rows_for_write(
+        latest, candidates, limit, day if mode == "diario" else None
+    )
     if not fresh:
-        print("Todos os candidatos já existem. Zero linhas adicionadas.")
+        print("Quota esgotada ou contactos existentes; zero linhas adicionadas.")
         return 0
-    if any(len(row) != 26 or row[24] != "Sim" or row[23] != "Por avaliar" for row in fresh):
-        raise RuntimeError("Bloqueio de contacto ausente: escrita recusada.")
     response = requests.post(
         f"{API}/values/Empresas%21A%3AZ:append",
         params={"valueInputOption": "RAW", "insertDataOption": "INSERT_ROWS"},
@@ -275,28 +295,39 @@ def write_test(credentials, candidates):
     response.raise_for_status()
     count = response.json().get("updates", {}).get("updatedRows")
     if count != len(fresh):
-        raise RuntimeError("Google Sheets não confirmou o número de linhas inseridas.")
-    new_rows = read_rows(credentials)
-    new_sources = [identity(row)[4] for row in new_rows]
+        raise RuntimeError("Sheets não confirmou o total escrito; rever antes de repetir.")
+    verified = read_rows(credentials)
+    all_sources = [identity(row)[4] for row in verified]
     for row in fresh:
-        if new_sources.count(identity(row)[4]) != 1:
-            raise RuntimeError("A escrita ocorreu, mas a verificação de duplicados falhou.")
-    print(f"TESTE DE ESCRITA CONFIRMADO: {len(fresh)} registo(s) adicionados; Não contactar=Sim.")
-    print("Nenhum email enviado; escrita diária continua desativada.")
-    return len(fresh)
+        if all_sources.count(identity(row)[4]) != 1:
+            raise RuntimeError("Escrita ocorreu, mas verificação de duplicados falhou.")
+    if mode == "diario" and count_imports_today(verified, day) > MAX_DAILY_WRITES:
+        raise RuntimeError("Quota diária excedida; investigação necessária.")
+    print(f"ESCRITA CONFIRMADA ({mode}): {count} registo(s); Não contactar=Sim.")
+    print("Nenhum email enviado.")
+    return count
 
 
 def main():
-    mode = os.environ.get("CRM_MODE", "simular")
-    validate_mode(mode, os.environ)
+    mode = validate_mode(os.environ.get("CRM_MODE", "simular"), os.environ)
     credentials = google_credentials()
     existing = read_rows(credentials)
-    print(f"CRM consultado: {len(existing)} empresas existentes. Modo: {mode}.", flush=True)
-    candidates = find_candidates(existing, MAX_TEST_WRITES if mode == "teste_escrita_2" else 30)
-    if mode == "simular":
-        print("SIMULAÇÃO: nenhuma escrita e nenhum envio de email.")
+    day = today_lisbon()
+    print(f"CRM consultado: {len(existing)} empresas. Modo: {mode}.", flush=True)
+    if mode == "diario":
+        remaining = daily_remaining(existing, day)
+        print(f"Quota automática {day}: {MAX_DAILY_WRITES - remaining}/{MAX_DAILY_WRITES} usadas.")
+        if remaining == 0:
+            print("Quota esgotada; zero escritas e nenhum email.")
+            return
+        candidates = find_candidates(existing, remaining)
+        write_candidates(credentials, candidates, remaining, mode, day=day)
+    elif mode == "teste_escrita_2":
+        candidates = find_candidates(existing, MAX_TEST_WRITES)
+        write_candidates(credentials, candidates, MAX_TEST_WRITES, mode)
     else:
-        write_test(credentials, candidates)
+        find_candidates(existing, MAX_DAILY_WRITES)
+        print("SIMULAÇÃO: nenhuma escrita e nenhum envio de email.")
 
 
 if __name__ == "__main__":
