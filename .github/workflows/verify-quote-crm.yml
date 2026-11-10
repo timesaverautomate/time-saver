@@ -1,4 +1,4 @@
-name: Testar integracao formulario CRM (interno)
+name: Verificar ligacao Sheets no Worker (diagnostico)
 on:
   push:
     branches: [main]
