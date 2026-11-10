@@ -1,5 +1,5 @@
 {
-  "status": "worker_preparado_por_publicar_e_validar",
+  "status": "aplicado_e_verificado_via_worker",
   "hosts": [
     "timesaverautomate.com",
     "www.timesaverautomate.com"
@@ -25,5 +25,7 @@
     "A origem GitHub Pages fica independente, sem associar o domínio personalizado no GitHub.",
     "Sem formulário nesta versão; não usar esta configuração para ativar recolha comercial."
   ],
-  "mechanism": "Worker src/site-proxy.mjs"
+  "mechanism": "Worker src/site-proxy.mjs",
+  "verifiedDate": "2026-11-10",
+  "verifiedRun": 42853443010
 }

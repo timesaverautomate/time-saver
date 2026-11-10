@@ -1,5 +1,7 @@
 # Domínio público e proteção da apresentação
 
+**Concluído e verificado em 10 de novembro de 2026:** https://timesaverautomate.com/ responde 200 por HTTPS. HTTP e www respondem 308 para o endereço principal. O workflow [42853443010](https://github.com/timesaverautomate/time-saver/actions/runs/42853443010) instalou o Worker, associou os dois hosts e verificou domínio, certificados e cabeçalhos. HSTS de um ano está ativo, sem includeSubDomains/preload. A origem GitHub continua independente.
+
 O titular pediu ligar timesaverautomate.com, reforçar a segurança e não fornecer dados legais. A versão pública continua informativa e em pré-lançamento, sem formulário, anexos, contas, pedidos comerciais, pagamentos ou analítica. Não são inventados dados de identificação nem se declara conformidade legal garantida.
 
 ## Solução escolhida
@@ -39,6 +41,8 @@ Se a credencial ou a emissão de certificado impedir a conclusão, o resultado i
 ## Operação
 
 Os commits do site continuam a publicar os ficheiros no GitHub. A camada Cloudflare consulta-os com cache curto (60 segundos). Alterações a src/site-proxy.mjs ou ao instalador voltam a publicar o Worker. O workflow também pode ser repetido em Actions.
+
+Ao mudar o alojamento, manter um serviço HTTPS com certificado válido antes de retirar este Worker ou alterar os registos: os navegadores podem conservar HSTS durante o prazo indicado.
 
 Manter MFA nas contas GitHub/Cloudflare, limitar quem pode alterar workflows e rever os acessos. Rever periodicamente o Node, ações fixadas, condições do alojamento e limites da conta. Não é possível afirmar segurança absoluta.
 

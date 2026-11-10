@@ -1,5 +1,13 @@
 # Verificações realizadas e pendentes
 
+> **Domínio concluído:** execução 42853443010 (commit 9ec9f07ac47da506187703546bb27f29b3967dfb) terminou com sucesso: 50 testes, pesquisa heurística de segredos em 21 commits/131 blobs de texto sem ocorrências dos padrões procurados, Worker instalado, domínio e www associados e HTTPS/cabeçalhos verificados. Não foram alterados planos pagos nem ativado um formulário.
+
+> **Pedidos reais verificados no domínio:** início, CSS, JavaScript, PNG e três páginas informativas responderam 200; login, admin e api/quote responderam 404. POST api/quote respondeu 405. HTTP e www responderam 308 para https://timesaverautomate.com/. CSP, HSTS de um ano, DENY, nosniff, políticas de referência/permissões, COOP e CORP foram confirmados. A imagem PNG recebida tem o mesmo SHA-256 do ficheiro de origem. Nas respostas inspecionadas não houve Set-Cookie.
+
+> **Renderização dos recursos públicos:** Chromium a 375 e 1440 px, menu móvel, teclado e demonstração aprovados, sem erros JavaScript, recursos falhados ou pedidos a terceiros. O Chromium do ambiente não confia diretamente na CA de inspeção do proxy da plataforma; os recursos reais foram obtidos pelo cliente HTTP com validação TLS e fornecidos à renderização por interceção de pedidos. Não se desativou a validação TLS do cliente HTTP. O certificado público foi também validado diretamente pela execução GitHub Actions. A validação local anterior a 320/375/768/1440 px mantém o alcance indicado abaixo.
+
+> **Decisão do titular:** não fornecer dados legais. A versão mantém-se informativa e sem recolha de pedidos. Não foram inventadas identidades, ativado email, obtida certificação de segurança ou validada conformidade legal integral. Os itens comerciais do historial abaixo não impedem este modo de apresentação.
+
 > Verificação adicional no motor workerd, através do Miniflare instalado com o Wrangler: o proxy respondeu 200 com origem de teste e reescrita ativa. Foi corrigida uma incompatibilidade de runtime: Workers usa redirect manual; respostas 3xx são recusadas explicitamente pelo proxy. O teste de regressão inclui uma origem que tenta redirecionar para outro destino. A emissão/ligação dos certificados da Cloudflare já foi observada por HTTPS, mas o serviço completo só fica verificado após o deploy corrigido.
 
 > Preparação do domínio informativo: 50 testes locais aprovados. Os dez testes adicionais verificam proxy fechado, caminhos/metadados, cabeçalhos, ausência de cópia de credenciais, preservação de PNG/HEAD, TLS antigo, rejeição de formulários inesperados, conflitos de domínio/Worker, HSTS após verificação e resultados parciais. A publicação real do Worker e dos certificados fica por confirmar até executar o novo workflow.

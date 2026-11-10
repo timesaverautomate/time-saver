@@ -2,7 +2,7 @@
 
 Website profissional em português de Portugal para apresentar serviços de automação e receber pedidos de orçamento.
 
-**Pré-lançamento no ar:** https://timesaverautomate.github.io/time-saver/ — publicado no GitHub Pages e verificado por HTTPS (HTTP 200), sem formulário ou recolha de pedidos. Código e testes automáticos preparados; teste operacional Resend recebido e confirmado. O domínio próprio e o formulário comercial continuam dependentes das configurações e dados legais descritos abaixo. Nenhuma compra foi efetuada. Não são necessários ficheiros no seu PC para manter ou publicar este projeto.
+**Site público:** https://timesaverautomate.com/ — domínio ligado e verificado por HTTPS (HTTP 200), com www/HTTP a encaminhar para o endereço principal. Ficheiros alojados no GitHub Pages e protegidos pelo Worker Cloudflare time-saver-edge. Sem formulário ou recolha de pedidos. Código e testes automáticos preparados; teste operacional Resend recebido e confirmado. O domínio próprio está ligado. Por decisão do titular, a apresentação continua sem formulário ou recolha comercial e sem dados legais inventados. Não se declara conformidade legal garantida. Nenhuma compra foi efetuada. Não são necessários ficheiros no seu PC para manter ou publicar este projeto.
 
 ## Começar aqui
 
@@ -59,7 +59,7 @@ Para desenvolvimento num ambiente na nuvem, é possível usar Wrangler com um am
 
 ## Alojamento escolhido: GitHub Pages
 
-O frontend está preparado para GitHub Pages, com recursos locais e caminhos adaptados ao projeto ou ao domínio personalizado. O domínio pretendido é https://timesaverautomate.com. Não deve ser considerado publicado antes do deploy e da verificação HTTP.
+O frontend está preparado para GitHub Pages, com recursos locais e caminhos adaptados ao projeto ou ao domínio personalizado. O domínio público verificado é https://timesaverautomate.com. A origem GitHub permanece independente em https://timesaverautomate.github.io/time-saver/, para ser consultada pelo Worker por HTTPS.
 
     npm run build:pages
 
@@ -67,10 +67,12 @@ O workflow de Pages constrói uma revisão, audita padrões de segredos no hist�
 
 O backend é separado, porque GitHub Pages não executa funções de servidor. O Worker suporta API dedicada, CORS para a origem exata, validação, limites partilhados e proteção contra duplicados. Na exportação estática, o formulário permanece desativado até configurar um endpoint HTTPS real em QUOTE_API_ORIGIN e o backend confirmar disponibilidade. A chave Resend fica no servidor.
 
-As ações oficiais estão fixadas em SHAs completos. A configuração de cabeçalhos e TLS Cloudflare está documentada e preparada como modelo, sem afirmar que já foi aplicada. O repositório público não contém os valores dos segredos de Actions.
+As ações oficiais estão fixadas em SHAs completos. Os cabeçalhos do domínio foram aplicados pelo Worker e verificados em respostas reais: CSP, HSTS, antienquadramento, nosniff, política de referência e permissões, COOP e CORP. O controlo da aplicação rejeita TLS 1.0/1.1; não se afirma ter alterado a definição global da zona. O repositório público não contém os valores dos segredos de Actions.
 
 A versão privada antiga no Sites mantém-se como referência de revisão enquanto o alojamento de destino está por concluir.
 
-Estado Cloudflare confirmado: a credencial permitiu registar o endereço de conta workers.dev em falta. A instalação parou depois com HTTP 401 ao aceder ao D1. Rever a permissão de conta D1: Edit e o âmbito da conta no token; não divulgar o valor. O Worker de orçamento ainda não está instalado nem operacional.
+Backend de orçamento inativo: a credencial permitiu registar o endereço de conta workers.dev em falta. A instalação parou depois com HTTP 401 ao aceder ao D1. Rever a permissão de conta D1: Edit e o âmbito da conta no token; não divulgar o valor. O Worker de orçamento ainda não está instalado nem operacional.
 
 O titular optou por não fornecer dados legais. O site público mantém-se como apresentação de pré-lançamento, sem recolha de pedidos. A ligação do domínio e os controlos HTTP passam a usar o Worker time-saver-edge em frente à origem GitHub Pages; consultar [o procedimento do domínio público](docs/DOMINIO-PUBLICO.md). Este Worker não usa D1 ou Resend.
+
+**Validação do domínio concluída:** workflow 42853443010, commit 9ec9f07ac47da506187703546bb27f29b3967dfb. HTTPS, redirecionamentos e cabeçalhos verificados. 50 testes aprovados; origem e domínio sem formulário. O bloqueio D1 do backend de orçamento não afeta este site informativo. Consulte [o relatório](docs/VALIDACAO.md).
