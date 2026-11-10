@@ -28,11 +28,19 @@ Honeypot, origem HTTPS exata, ticket assinado com tempo mínimo e idempotência 
 
 ## Verificações executadas antes da publicação
 
-**67 testes automáticos aprovados**. Incluem validação, injeção em cabeçalhos, campos adicionais, formatos/JSON inválidos, corpo excessivo, tickets adulterados/expirados, isolamento das quotas, falhas do fornecedor, idempotência e timeout absoluto com relógio de teste. O motor workerd executou os módulos e o envio para um fornecedor simulado com sucesso.
+**74 testes automáticos aprovados**. Incluem validação, injeção em cabeçalhos, campos adicionais, formatos/JSON inválidos, corpo excessivo, tickets adulterados/expirados, isolamento das quotas, falhas do fornecedor, idempotência e timeout absoluto com relógio de teste. O motor workerd executou os módulos e o envio para um fornecedor simulado com sucesso.
 
 Chromium a 375 e 1440 px, com API inteiramente simulada: um erro com `<img onerror>` e `<script>` foi apresentado como texto, sem execução nem elementos injetados. Trusted Types bloqueou atribuição de HTML e handlers inline. Campos bloqueados durante busy e restaurados após falha; renovação preservou dados e não enviou automaticamente. Uma resposta 200 sem aceitação não foi anunciada como sucesso. Não foram enviados emails nesses testes.
 
-A publicação e as verificações HTTP desta revisão serão registadas abaixo após execução. Os testes anteriores de entrega real, SPF/DKIM/DMARC e duplicados estão em [VALIDACAO.md](VALIDACAO.md).
+## Verificação real da publicação
+
+A primeira publicação desta revisão foi concluída no commit `dbe7e746c7f9ce2b0caaaff3332e31f34afa9ccb`: Worker pelo workflow 42863915830 e Pages pelo workflow 42863915771. HTTPS, CSP/Trusted Types, DENY, nosniff, HSTS de um ano, políticas de referência/permissões, COOP/CORP e ausência de Set-Cookie foram observados nas respostas reais. A auditoria heurística percorreu 34 commits e 196 blobs de texto sem ocorrências dos padrões procurados.
+
+No domínio real: email inválido e destinatário adicional rejeitados com 422; origem externa com 403; corpo excessivo com 413; todas estas respostas com `no-store`. Uma sequência limitada de pedidos inválidos terminou em 429. Os testes não enviaram esses pedidos por email.
+
+Depois das alterações, novo pedido sintético pela interface recebeu a referência `TS-ED32CC1319B71F80614E` e foi encontrado na caixa INBOX de `timesaverautomate@gmail.com`. A repetição devolveu a mesma referência e a pesquisa encontrou uma única mensagem. A interface pública passou em Chromium a 375 e 1440 px, sem erros JavaScript, recursos falhados ou pedidos de recursos externos.
+
+A consulta da definição TLS mínima da zona recebeu 403 com a credencial usada. Foi acrescentada uma verificação independente de handshake, executada diretamente no GitHub Actions com certificado e hostname validados; o resultado será registado após essa execução. Erros locais, de cifras ou de certificado não são apresentados como rejeição de protocolos pelo servidor. Os testes anteriores de entrega real e SPF/DKIM/DMARC estão também em [VALIDACAO.md](VALIDACAO.md).
 
 ## Operação e limites da verificação
 

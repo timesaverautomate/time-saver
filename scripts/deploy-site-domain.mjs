@@ -22,8 +22,8 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
     requireDomain(typeof source==='string' && source.includes('timesaverautomate.github.io'),'invalid_proxy_source');
     const formRequested=env.FORM_ENABLED==='true';
     if(formRequested)requireDomain(/^re_[A-Za-z0-9_-]{8,256}$/.test(env.RESEND_API_KEY||''),'missing_resend_key');
-    async function cf(endpoint,{method='GET',body,notFound=false,operation='cloudflare_request'}={}) {
-      const headers={Authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN};
+    async function cf(endpoint,{method='GET',body,notFound=false,operation='cloudflare_request',credential=env.CLOUDFLARE_API_TOKEN}={}) {
+      const headers={Authorization:'Bearer '+credential};
       if(body!==undefined && !(body instanceof FormData)) headers['Content-Type']='application/json';
       let response;
       try {response=await fetcher('https://api.cloudflare.com/client/v4'+endpoint,{
@@ -143,7 +143,15 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
       if(await verify(true)){verified=true;break;}
       if(i<5)await sleep(2_000);
     }
-    const zoneTLS=verified?await hardenZoneTLS({zoneId:domains.find(d=>d.hostname===DOMAIN)?.zone_id,cf}):{verified:false,changed:false,code:'https_not_verified'};
+    const zoneId=domains.find(d=>d.hostname===DOMAIN)?.zone_id;
+    let zoneTLS=verified?await hardenZoneTLS({zoneId,cf}):{verified:false,changed:false,code:'https_not_verified'};
+    // Uma credencial de zona já guardada pode ter âmbito distinto da chave limitada ao Worker.
+    const zoneCredential=env.CLOUDFLARE_ZONE_API_TOKEN;
+    if(zoneTLS.code==='minimum_tls_permission_unavailable' && typeof zoneCredential==='string'
+      && zoneCredential.length>=20 && zoneCredential.length<=512 && !/[\s\x00-\x1f\x7f]/.test(zoneCredential)
+      && zoneCredential!==env.CLOUDFLARE_API_TOKEN){
+      zoneTLS={...await hardenZoneTLS({zoneId,cf:(path,options)=>cf(path,{...options,credential:zoneCredential})}),credentialFallbackAttempted:true};
+    }
     return {configured:true,verified,installed,attached,contactApiConfigured:formRequested&&verified,zoneTLS,
       code:verified?(formRequested?'domain_and_contact_api_verified':'domain_and_security_verified'):'hsts_verification_pending'};
   }catch(error){return {configured:attached.length>0,verified:false,installed,attached,

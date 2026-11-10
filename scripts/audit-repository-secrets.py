@@ -21,7 +21,7 @@ RULES = [
     ("aws-access-key", re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")),
     ("private-key", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
     ("secret-assignment", re.compile(
-        r"""(?:RESEND_API_KEY|SECURITY_HMAC_KEY|CLOUDFLARE_API_TOKEN|GITHUB_TOKEN)["']?\s*[:=]\s*["']([A-Za-z0-9_+/=-]{20,})["']""",
+        r"""(?:RESEND_(?:DOMAIN_)?API_KEY|SECURITY_HMAC_KEY|CLOUDFLARE_(?:(?:SITE|ZONE)_)?API_TOKEN|GITHUB_TOKEN)["']?\s*[:=]\s*["']([A-Za-z0-9_+/=-]{20,})["']""",
         re.IGNORECASE,
     )),
 ]
