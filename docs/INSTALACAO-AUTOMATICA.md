@@ -13,7 +13,7 @@ A autorização dada no chat não cria uma sessão Cloudflare nem uma credencial
 3. Limitar os recursos à conta pretendida e atribuir apenas as permissões de conta necessárias: **Workers Scripts: Edit**, **D1: Edit** e **Account Settings: Read**. Não usar a Global API Key. Para esta instalação não são necessárias permissões de DNS ou faturação.
 4. Guardar o token diretamente em [GitHub → Settings → Secrets and variables → Actions](https://github.com/timesaverautomate/time-saver/settings/secrets/actions), opção New repository secret, com o nome **CLOUDFLARE_API_TOKEN**. Não o colar no chat, em ficheiros, issues, variáveis públicas ou logs.
 5. Se o token abranger mais de uma conta, guardar o ID da conta pretendida na variável Actions **CLOUDFLARE_ACCOUNT_ID**. Sem seleção e com várias contas, a instalação para; não escolhe uma conta arbitrária.
-6. Confirmar que Workers já está disponível no plano gratuito e tem um subdomínio workers.dev na conta. A instalação não aceita condições de serviço nem ativa planos pagos em nome do titular.
+6. A instalação lê o subdomínio workers.dev da conta e, se ainda não existir, regista um endereço gratuito estável com o prefixo timesaverautomate e um sufixo da conta. Não altera endereços existentes, planos ou faturação. Se o fornecedor exigir outro passo de ativação, o resultado indica a operação e o código HTTP sem divulgar a chave.
 
 A chave **RESEND_API_KEY** já está guardada em Actions Secrets. O workflow copia-a para um segredo do Worker por stdin; nunca a disponibiliza ao navegador. Não é necessário partilhá-la novamente.
 

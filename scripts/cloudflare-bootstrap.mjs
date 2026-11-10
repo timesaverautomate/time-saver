@@ -68,7 +68,13 @@ export async function bootstrapCloudflare({ env, fetcher = fetch, command, saveC
     }
     requireSetup(ACCOUNT_ID.test(accountId), 'invalid_account_id');
     const base = '/accounts/' + accountId;
-    const subdomain = await cloudflare(base + '/workers/subdomain');
+    let subdomain = await cloudflare(base + '/workers/subdomain',{allowNotFound:true});
+    if (!subdomain?.subdomain) {
+      // Registar apenas o endereço gratuito em falta; não alterar subdomínios existentes.
+      subdomain=await cloudflare(base + '/workers/subdomain',{
+        method:'PUT',body:{subdomain:'timesaverautomate-' + accountId.slice(-8)}
+      });
+    }
     requireSetup(typeof subdomain?.subdomain === 'string'
       && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(subdomain.subdomain), 'workers_onboarding_required');
     backendOrigin = 'https://' + WORKER_NAME + '.' + subdomain.subdomain + '.workers.dev';

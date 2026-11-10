@@ -15,7 +15,9 @@
   "githubPagesBuildType": "workflow",
   "privacyEmail": "timesaverautomate@gmail.com",
   "lastVerifiedDate": "2026-11-10",
-  "githubPagesDeploymentVerified": false,
+  "githubPagesDeploymentVerified": true,
   "publicationMode": "preview",
-  "publicPreviewAuthorised": true
+  "publicPreviewAuthorised": true,
+  "githubPagesVerifiedURL": "https://timesaverautomate.github.io/time-saver/",
+  "githubPagesVerifiedCommit": "6a64a7d7c01528e0be88fc206d5a77d0e36ff626"
 }

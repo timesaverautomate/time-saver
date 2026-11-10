@@ -10,7 +10,7 @@ function environment() {
     RESEND_API_KEY:'re_only_a_unit_test_value' };
 }
 function fixture({ existing = null, secrets = [], databases = [], accounts = [{id:accountId}],
-  jurisdiction = 'eu', probeAvailable = false, leakOrigin = false, schemaValid = true } = {}) {
+  jurisdiction = 'eu', probeAvailable = false, leakOrigin = false, schemaValid = true, subdomainMissing = false } = {}) {
   const calls = [], commands = [], configs = [], masks = [];
   let activeSecrets = [...secrets];
   function json(result) { return Response.json({success:true,result}); }
@@ -27,7 +27,10 @@ function fixture({ existing = null, secrets = [], databases = [], accounts = [{i
       }});
     }
     if (path === '/client/v4/accounts') return json(accounts);
-    if (path.endsWith('/workers/subdomain')) return json({subdomain:'timesaverautomate'});
+    if (path.endsWith('/workers/subdomain')) {
+      if (options.method==='PUT') return json(JSON.parse(options.body));
+      return subdomainMissing ? new Response('',{status:404}) : json({subdomain:'timesaverautomate'});
+    }
     if (path.endsWith('/settings')) return existing ? json(existing) : new Response('',{status:404});
     if (path.endsWith('/secrets')) return json(activeSecrets);
     if (path.endsWith('/query')) return json([{success:true,results:schemaValid
@@ -94,6 +97,15 @@ test('reinstalação preserva a chave HMAC e reutiliza a base existente', async 
   assert.equal(f.calls.filter(c=>c.options.method==='POST' && !c.url.endsWith('/query')).length,0);
   assert.deepEqual(JSON.parse(f.commands.at(-1).options.input),{RESEND_API_KEY:f.options.env.RESEND_API_KEY});
   assert.equal(f.masks.length,0);
+});
+
+test('instalação regista workers.dev apenas quando a conta ainda não tem subdomínio',async()=>{
+  const f=fixture({subdomainMissing:true}); const result=await bootstrapCloudflare(f.options);
+  assert.equal(result.installed,true);
+  assert.match(result.backendOrigin,/timesaverautomate-aaaaaaaa\.workers\.dev$/);
+  const registration=f.calls.filter(c=>c.url.endsWith('/workers/subdomain') && c.options.method==='PUT');
+  assert.equal(registration.length,1);
+  assert.deepEqual(JSON.parse(registration[0].options.body),{subdomain:'timesaverautomate-aaaaaaaa'});
 });
 
 test('instalação recusa escolher entre contas ou sobrepor Worker alheio/ativo', async () => {
