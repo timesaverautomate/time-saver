@@ -1,33 +1,34 @@
-# Teste controlado de escrita no CRM TimeSaver
+# TimeSaver — Pesquisa e atualização controlada do CRM
 
-O workflow **TimeSaver - pesquisar contactos B2B** foi preparado com dois modos:
+## Estado — escrita diária não ativada
 
-- **simular** (padrão): pesquisa até 30 candidatos, consulta o Google Sheets, não escreve nem envia emails.
-- **teste_escrita_2** (apenas execução manual na branch main): pesquisa candidatos novos e grava **no máximo dois** na aba **Empresas** do CRM TimeSaver_CRM_Prospeccao. Não envia emails.
+A pesquisa B2B está programada para dias úteis, às 08:15 UTC (08:15 de inverno e 09:15 de verão em Portugal, podendo haver atrasos no GitHub Actions). O script pesquisa empresas em fontes OpenStreetMap; encontrar 30 empresas por dia não é garantido, sobretudo se as fontes estiverem indisponíveis ou não publicarem email comercial genérico.
 
-O agendamento de dias úteis continua ativo apenas para **simular**, às 08:15 UTC. A escrita diária **não está ativada**. Não existe opção para escrever 30 registos em produção neste workflow.
+### Modos
 
-## Como fazer o teste
+- simular: modo padrão, não grava nem envia emails.
+- teste_escrita_2: acionamento manual na branch main, grava no máximo 2 novos candidatos, sempre com bloqueio de contacto.
+- diario: só eventos agendados, branch main e repositório TimeSaver, com variável GitHub Actions CRM_DAILY_WRITE_ENABLED definida exatamente como true. Não está disponível no menu manual.
 
-1. Em GitHub Actions, selecionar **TimeSaver - pesquisar contactos B2B**.
-2. Clicar **Run workflow**, manter branch **main** e selecionar **mode = teste_escrita_2**.
-3. Abrir o job **pesquisar** e a etapa **Pesquisa CRM (sem envios)**.
-4. Procurar a mensagem **TESTE DE ESCRITA CONFIRMADO**.
-5. Abrir Google Sheets → **Empresas** e verificar as linhas adicionadas. O painel deve refletir a nova contagem se as fórmulas estiverem corretas.
+Sem a variável CRM_DAILY_WRITE_ENABLED=true, a execução diária continua em SIMULAÇÃO. Nenhuma alteração foi feita às variáveis do repositório para ativá-la.
 
-Os registos ficam com **Prioridade = Por avaliar**, **Consentimento/base legal = Por avaliar**, **Não contactar = Sim** e **Notas** a indicar que a fonte OpenStreetMap não foi verificada. Não podem ser utilizados para campanhas sem revisão. Repetir o teste deve ignorar emails, domínios e identificadores OSM já registados. Se não houver candidatos novos ou as fontes falharem, o job deverá terminar com erro ou indicar zero inserções; não foi programado qualquer envio.
+### Proteções
 
-## Proteções
+1. Validação dos 26 cabeçalhos da aba Empresas antes de qualquer escrita.
+2. Pesquisa em fontes OSM e apenas emails genéricos de negócios; exclusão de webmail comum. Os dados não são verificados como verdadeiros.
+3. Deduplicação por nome e localidade, email, domínio e identificador OSM; releitura do CRM imediatamente antes de gravar.
+4. Limite de 30 novas linhas automáticas por dia em Europe/Lisbon. A coluna Notas recebe o marcador TSCRM_AUTO_DATE=AAAA-MM-DD; repetição no mesmo dia desconta registos já inseridos. As duas linhas antigas do teste manual não têm este marcador e não entram na quota automática.
+5. Registos sempre com Não contactar = Sim, base legal = Por avaliar e campos de envio vazios. Nenhum email é enviado, nem há dependência Resend neste workflow.
+6. Execuções do mesmo workflow serializadas; a API Sheets não fornece transação atómica face a outros programas ou edição simultânea. Não apagar o marcador de importação nas notas.
+7. Após append, o script valida quantidade inserida e unicidade dos identificadores; resposta inconclusiva obriga a rever o CRM antes de repetir.
+8. Alterações ao código no GitHub disparam testes Python em job isolado, sem credenciais de Google e sem escrita na folha.
 
-- É exigida a estrutura exata de 26 cabeçalhos no CRM.
-- As pesquisas diárias não podem mudar para escrita; o script exige disparo manual, repositório, branch e workflow específicos.
-- Máximo de duas linhas por teste, mesmo que a fonte devolva mais.
-- Releitura antes de inserir para reduzir duplicados, com bloqueio contra execuções concorrentes do próprio workflow.
-- Verificação após escrita pela chave OSM e confirmação da quantidade de linhas devolvida pelo Google Sheets.
-- Sem Resend nem qualquer código de envio de mensagens neste processo.
+### Antes da ativação
 
-**Limitações:** fontes OpenStreetMap podem estar indisponíveis; emails públicos e lojas não são automaticamente validados; a verificação de duplicados não substitui revisão humana; alterações ao CRM feitas por outros processos entre leitura e escrita podem gerar concorrência. O código não constitui validação da base legal de prospeção.
+- Validar a nova suite de testes no GitHub Actions.
+- Confirmar uma simulação com o código novo e rever amostras de empresas e emails na folha.
+- Validar políticas de utilização das fontes, privacidade, critérios de relevância e base legal para armazenar/tratar os dados.
+- Confirmar ausência de contactos enviados e a lista de exclusão.
+- Apenas quando todas as validações forem satisfatórias: Settings > Secrets and variables > Actions > Variables > CRM_DAILY_WRITE_ENABLED = true.
 
-## Antes de habilitar escrita diária
-
-Rever a qualidade e exatidão dos contactos, critérios comerciais, fontes e condições de utilização; definir política de exclusão e base legal; adicionar logs de auditoria apropriados; validar um teste com no máximo duas empresas; e só então criar uma etapa separada com limites e aprovação explícita para escrita automática. Os emails comerciais mantêm-se fora do âmbito deste workflow.
+Não mudar a variável enquanto houver pendências. A automação é exclusivamente de pesquisa e atualização do CRM e não de campanhas de email.
