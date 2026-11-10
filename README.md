@@ -10,7 +10,7 @@ O Worker valida o pedido e envia **texto simples** pelo Resend, de `pedidos@time
 
 **Sem base de dados de pedidos, CRM ou folhas de cálculo ligados ao formulário.** Não são guardados corpos em logs da aplicação nem em armazenamento persistente do navegador. O Resend conserva conteúdo e registos durante 30 dias, conforme o fornecedor; esta utilização foi expressamente aceite pelo titular. A caixa Gmail conserva as mensagens recebidas. Consulte [o funcionamento e operação](docs/FORMULARIO-EMAIL.md).
 
-A implementação está preparada para publicar o formulário depois de verificar a API. O resultado dos testes reais e da receção é registado em [VALIDACAO.md](docs/VALIDACAO.md); não confundir uma resposta de aceitação do fornecedor com entrega na caixa de entrada.
+**Formulário operacional e verificado em 10/11/2026:** pedido submetido pelo domínio e recebido na caixa de entrada, com triagem incluída. Repetir a mesma tentativa conservou a referência e resultou numa única mensagem. SPF, DKIM e DMARC pass confirmados no Gmail. Consulte [os resultados e limites](docs/VALIDACAO.md); a mensagem apresentada ao visitante confirma aceitação pelo fornecedor, não entrega na caixa de entrada.
 
 ## Estrutura ativa
 

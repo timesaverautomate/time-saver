@@ -20,7 +20,7 @@
   "publicPreviewAuthorised": true,
   "githubPagesVerifiedURL": "https://timesaverautomate.github.io/time-saver/",
   "githubPagesVerifiedCommit": "c6bd04c635a46441b31276339bb446827e4689ee",
-  "backendInstallationState": "stateless_email_prepared",
+  "backendInstallationState": "stateless_email_verified",
   "workersDevAccountRegistered": true,
   "domainDelivery": "github-pages-origin-cloudflare-worker",
   "edgeWorker": "time-saver-edge",
@@ -34,5 +34,12 @@
   "directEmailFormAuthorised": true,
   "emailProviderRetentionAccepted": true,
   "requestDatabase": "none",
-  "formTechnicalReady": false
+  "formTechnicalReady": true,
+  "formVerifiedDate": "2026-11-10",
+  "formVerifiedCommit": "70423be1bd738d975f4bc9f9f7449d315735f47a",
+  "formVerifiedReference": "TS-EC711BFE90FB4FAA8917",
+  "formInboxDeliveryVerified": true,
+  "formDuplicateSuppressionVerified": true,
+  "contactApiVerifiedRun": 42860411797,
+  "contactPagesVerifiedRun": 42860411662
 }
