@@ -40,7 +40,24 @@ No domínio real: email inválido e destinatário adicional rejeitados com 422; 
 
 Depois das alterações, novo pedido sintético pela interface recebeu a referência `TS-ED32CC1319B71F80614E` e foi encontrado na caixa INBOX de `timesaverautomate@gmail.com`. A repetição devolveu a mesma referência e a pesquisa encontrou uma única mensagem. A interface pública passou em Chromium a 375 e 1440 px, sem erros JavaScript, recursos falhados ou pedidos de recursos externos.
 
-A consulta da definição TLS mínima da zona recebeu 403 com a credencial usada. Foi acrescentada uma verificação independente de handshake, executada diretamente no GitHub Actions com certificado e hostname validados; o resultado será registado após essa execução. Erros locais, de cifras ou de certificado não são apresentados como rejeição de protocolos pelo servidor. Os testes anteriores de entrega real e SPF/DKIM/DMARC estão também em [VALIDACAO.md](VALIDACAO.md).
+A revisão final está no commit `bcedec73f2fb563b1fe547426f3190e2c59dcf4a`. O workflow [42864927352](https://github.com/timesaverautomate/time-saver/actions/runs/42864927352) confirmou domínio/API e executou a verificação independente de handshake diretamente no GitHub Actions. **74 testes passaram**; a auditoria do histórico examinou 36 commits e 207 blobs sem os padrões procurados. O teste de transporte mantém estado de falha intencionalmente enquanto a pendência abaixo existir; o sucesso do deploy não é apresentado como aprovação integral do TLS.
+
+## Pendência confirmada: protocolos TLS antigos na Cloudflare
+
+O teste real negociou TLS 1.0, 1.1, 1.2 e 1.3, com certificado e hostname validados. Portanto, as versões modernas funcionam, mas **as versões 1.0 e 1.1 ainda são aceites no handshake**. O Worker recusa os pedidos dessas versões com HTTP 426, mas isso não desativa o protocolo na ligação inicial.
+
+A consulta da definição mínima da zona recebeu **HTTP 403** com a credencial disponível. Nenhuma alteração dessa opção foi declarada como concluída. A seleção das credenciais de zona já disponíveis não permitiu ultrapassar a limitação; não foram recolhidas novas credenciais nem alargadas permissões automaticamente.
+
+Para concluir pelo navegador, sem custos:
+
+1. Abrir Cloudflare e selecionar `timesaverautomate.com`.
+2. Abrir **SSL/TLS → Edge Certificates → Minimum TLS Version** (Certificados de borda → Versão mínima de TLS).
+3. Selecionar **TLS 1.2** e guardar. Não selecionar apenas TLS 1.3, para manter compatibilidade com navegadores que suportam 1.2.
+4. Reexecutar o job `configure` do workflow de domínio. O teste `time-saver/transport-tls` só passa quando TLS 1.0/1.1 forem recusados e TLS 1.2/1.3 continuarem disponíveis.
+
+Alternativa para permitir manutenção automática: guardar em GitHub Actions Secrets uma credencial `CLOUDFLARE_ZONE_API_TOKEN` com permissão de leitura/edição de **Zone Settings**, limitada a este domínio. Nunca enviar o valor por chat ou colocá-lo no código. O instalador só tenta elevar versões antigas a 1.2 e não reduz uma configuração 1.3 existente.
+
+Os testes anteriores de entrega real e SPF/DKIM/DMARC estão também em [VALIDACAO.md](VALIDACAO.md).
 
 ## Operação e limites da verificação
 

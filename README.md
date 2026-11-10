@@ -45,7 +45,7 @@ Para verificar num ambiente de desenvolvimento na nuvem, com Node 24:
 
 HTTPS, HSTS, CSP, antienquadramento, validação de origem e campos no servidor, limite de 16 KiB, honeypot, ticket assinado, limites nativos de submissão e idempotência do Resend. Sem login, registo, anexos, pagamentos, chatbot, analítica ou recursos externos no navegador. Os contadores Cloudflare são aproximados por localização; não constituem um limite mundial estrito. A idempotência protege a repetição da mesma tentativa durante a janela documentada; não identifica pedidos iguais iniciados em páginas novas.
 
-Consulte também a [revisão de segurança e respetivos limites](docs/SEGURANCA.md).
+Consulte também a [revisão de segurança e respetivos limites](docs/SEGURANCA.md): 74 testes aprovados e proteções publicadas. **Pendente:** definir TLS mínimo 1.2 na Cloudflare; o teste real ainda negociou 1.0/1.1 e a credencial disponível recebeu 403 nessa definição. O caminho exato está no relatório.
 
 ## Informação jurídica
 
