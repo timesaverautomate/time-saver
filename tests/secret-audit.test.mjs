@@ -36,3 +36,18 @@ test('auditoria encontra credencial apagada do ficheiro atual sem imprimir o val
     assert.equal(data.secret_values_printed,false);
   } finally {rmSync(repo.directory,{recursive:true,force:true});}
 });
+test('auditoria deteta token Resend com hífen no histórico sem divulgar o valor',()=>{
+  const repo=repository();
+  try {
+    const fixture='re_'+'A'.repeat(8)+'-'+'B'.repeat(20);
+    writeFileSync(path.join(repo.directory,'token-fixture.txt'),fixture);repo.commit();
+    writeFileSync(path.join(repo.directory,'token-fixture.txt'),'Credencial removida\n');repo.commit();
+    const result=spawnSync('python',[script,'--repository',repo.directory],{encoding:'utf8'});
+    const data=JSON.parse(result.stdout);
+    assert.equal(result.status,1);assert.equal(data.passed,false);
+    assert.equal(data.commits_checked,2);
+    assert.ok(data.findings.some(finding=>finding.rule==='resend-token'&&finding.path==='token-fixture.txt'));
+    assert.equal((result.stdout+result.stderr).includes(fixture),false);
+    assert.equal(data.secret_values_printed,false);
+  } finally {rmSync(repo.directory,{recursive:true,force:true});}
+});

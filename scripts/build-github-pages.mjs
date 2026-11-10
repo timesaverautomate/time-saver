@@ -6,7 +6,7 @@ import { contactHTML } from './contact-html.mjs';
 
 const root = path.resolve(import.meta.dirname,'..');
 const legalRoutes = new Set(['privacidade','aviso-legal','cookies']);
-const csp = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests";
+const csp = "default-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'none'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; worker-src 'none'; require-trusted-types-for 'script'; trusted-types 'none'; upgrade-insecure-requests";
 
 export async function buildGitHubPages({
   sourceDirectory = path.join(root,'public'),

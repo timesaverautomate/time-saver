@@ -76,6 +76,7 @@ if (form) {
   let submissionKey = '', lastSignature = '';
   let tokenReadyTimer;
   const originalLabel = submitLabel.textContent;
+  const editableFields=Array.from(form.querySelectorAll('input,textarea,select'));
   const limits = {name:[2,100],email:[3,254],description:[30,4000],company:[0,160],tools:[0,500],specifics:[0,500]};
   const labels = {name:'Nome',email:'Email de contacto',description:'Descrição do processo',company:'Empresa',tools:'Ferramentas',service:'Tipo de ajuda',budget:'Orçamento',deadline:'Prazo',goal:'Objetivo',frequency:'Frequência',startingPoint:'Ponto de partida',specifics:'Detalhes'};
   const context = {
@@ -193,13 +194,14 @@ if (form) {
       submissionKey = crypto.randomUUID(); lastSignature = signature;
     }
     busy = true; submit.disabled = true;
+    editableFields.forEach(field=>{field.disabled=true;});
     form.setAttribute('aria-busy','true'); submitLabel.textContent = 'A enviar o pedido…';
     result.replaceChildren();
     try {
       const response = await fetch(apiBase+'/api/quote',{
         method:'POST', credentials:'omit', cache:'no-store',
         headers:{'Content-Type':'application/json','Idempotency-Key':submissionKey},
-        body:JSON.stringify({...data,token}),signal:AbortSignal.timeout(20_000)
+        body:JSON.stringify({...data,token}),signal:AbortSignal.timeout(25_000)
       });
       const payload = await response.json();
       if (response.ok && payload.accepted === true && payload.reference) {
@@ -213,12 +215,19 @@ if (form) {
       else {
         showMessage(payload.message || 'Não foi possível confirmar o envio. Os dados foram mantidos; tente novamente.');
         if (payload.renewKey) submissionKey = '';
-        if (payload.refreshToken) await refreshToken();
+        if (payload.refreshToken) {
+          await refreshToken();
+          if(token){
+            submissionKey='';lastSignature='';
+            showMessage('A sessão foi renovada e os campos foram mantidos. Verifique os dados e volte a carregar em Enviar pedido de orçamento. O envio não foi repetido automaticamente.');
+          }
+        }
       }
     } catch {
       showMessage('Não foi possível confirmar o envio. Os dados foram mantidos. Verifique a ligação e tente novamente com os mesmos dados para evitar duplicados.');
     } finally {
       busy = false; form.setAttribute('aria-busy','false');
+      editableFields.forEach(field=>{field.disabled=false;});
       submit.disabled = !available || sent;
       if (!sent) submitLabel.textContent = originalLabel;
     }

@@ -5,7 +5,7 @@ const ORIGIN='https://timesaverautomate.github.io';
 const PREFIX='/time-saver/';
 const ROUTES=new Set(['','index.html','styles.css','app.js','logo.svg','favicon.svg',
   'partilha.png','partilha.svg','404.html','robots.txt','privacidade/','aviso-legal/','cookies/']);
-const POLICY="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests";
+const POLICY="default-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'none'; img-src 'self'; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; worker-src 'none'; require-trusted-types-for 'script'; trusted-types 'none'; upgrade-insecure-requests";
 
 function protectedHeaders(env, upstream) {
   const headers=new Headers(upstream || {});

@@ -1,13 +1,6 @@
 name: Testar envio de email
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/test-email.yml'
-      - 'scripts/test-email.mjs'
-      - 'scripts/run-email-diagnostic.mjs'
 permissions:
   contents: read
   statuses: write
@@ -16,16 +9,23 @@ concurrency:
   cancel-in-progress: false
 jobs:
   test-email:
-    if: github.ref == 'refs/heads/main'
+    if: github.repository_id == '1452563434' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
+      - name: Validar código sem credenciais externas
+        run: npm run check
+      - name: Auditar histórico antes de usar credenciais externas
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/audit-repository-secrets.py --github-status
       - name: Enviar teste para o titular da conta Resend e registar resultado
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}

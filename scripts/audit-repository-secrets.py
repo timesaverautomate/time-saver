@@ -15,7 +15,7 @@ FIXTURES = {
     "unit-test-value-never-use-in-production-",
 }
 RULES = [
-    ("resend-token", re.compile(r"\bre_[A-Za-z0-9_]{16,}\b")),
+    ("resend-token", re.compile(r"\bre_[A-Za-z0-9_-]{16,}\b")),
     ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b")),
     ("github-fine-grained-token", re.compile(r"\bgithub_pat_[A-Za-z0-9_]{30,}\b")),
     ("aws-access-key", re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")),

@@ -83,7 +83,11 @@ function deploymentFixture({settings=null,domains=[],dnsOccupied=false,certPendi
     if(parsed.hostname==='timesaverautomate.github.io')return upstream();
     if([DOMAIN,'www.'+DOMAIN].includes(parsed.hostname)) {
       if(certPending)throw Error('certificate_pending');
-      if(contact&&path==='/api/form-status')return Response.json({available:true,version:'direct-email-v1'});
+      if(contact&&path==='/api/form-status'){
+        const base=await proxyFetch(new Request('https://'+DOMAIN+'/'),{HSTS_ENABLED:String(hsts)},async()=>upstream());
+        const headers=new Headers(base.headers);headers.set('Cache-Control','no-store');
+        return Response.json({available:true,version:'direct-email-v1'},{headers});
+      }
       return proxyFetch(new Request(url),{HSTS_ENABLED:String(hsts)},async()=>upstream());
     }
     assert.equal(parsed.hostname,'api.cloudflare.com');

@@ -1,11 +1,6 @@
 name: Verificar email do formulário
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/form-email-setup.yml'
-      - 'scripts/probe-form-email.mjs'
 permissions: {}
 concurrency:
   group: time-saver-form-email-setup
@@ -14,7 +9,7 @@ jobs:
   inspect:
     if: github.repository_id == '1452563434' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 5
     permissions:
       contents: read
       statuses: write
@@ -22,9 +17,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: '24'
+      - name: Validar código sem credenciais externas
+        run: npm run check
+      - name: Auditar histórico antes de usar credenciais externas
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/audit-repository-secrets.py --github-status
       - name: Verificar remetente e configuração disponível
         env:
           GITHUB_TOKEN: ${{ github.token }}

@@ -5,6 +5,9 @@ export const STARTING_POINT_OPTIONS = ['A definir','Já existe um ficheiro ou pr
 export const BUDGET_OPTIONS = ['A definir', 'Até 500 €', '500 € a 1 500 €', '1 500 € a 5 000 €', 'Mais de 5 000 €'];
 export const DEADLINE_OPTIONS = ['A definir', 'Assim que possível', 'No próximo mês', 'Nos próximos 3 meses', 'Sem prazo definido'];
 export const MAX_BODY = 16_384;
+export class BodyTimeoutError extends Error {
+  constructor(){super('body_timeout');this.name='BodyTimeoutError';}
+}
 export function validEmail(value) {
   return typeof value === 'string' && value.length <= 254 && /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/.test(value)
     && value.split('@')[0].length <= 64 && !value.startsWith('.') && !value.includes('.@')
@@ -35,19 +38,30 @@ export function validateSubmission(input) {
   }
   return { data, errors };
 }
-export async function readBoundedJSON(request) {
+export async function readBoundedJSON(request,{timeoutMs=8000}={}) {
   if (request.headers.get('content-encoding') && request.headers.get('content-encoding') !== 'identity') throw new RangeError('encoding');
   const announced = request.headers.get('content-length');
   if (announced && (!/^\d+$/.test(announced) || Number(announced) > MAX_BODY)) throw new RangeError('size');
   const reader = request.body?.getReader();
   if (!reader) throw new SyntaxError('body');
   const chunks = []; let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > MAX_BODY) { await reader.cancel(); throw new RangeError('size'); }
-    chunks.push(value);
+  let timer;
+  // Deadline total: um fluxo que envia pequenos fragmentos não o reinicia.
+  const deadline=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new BodyTimeoutError()),timeoutMs);});
+  try {
+    for (;;) {
+      const { done, value } = await Promise.race([reader.read(),deadline]);
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_BODY) throw new RangeError('size');
+      chunks.push(value);
+    }
+  } catch(error) {
+    // Não aguardar um cancel() controlado por um fluxo lento ou avariado.
+    void reader.cancel().catch(()=>{});
+    throw error;
+  } finally {
+    clearTimeout(timer);reader.releaseLock();
   }
   const all = new Uint8Array(size); let offset = 0;
   for (const part of chunks) { all.set(part, offset); offset += part.length; }

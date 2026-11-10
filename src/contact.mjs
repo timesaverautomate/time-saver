@@ -1,4 +1,4 @@
-import { validateSubmission,readBoundedJSON } from './validation.mjs';
+import { validateSubmission,readBoundedJSON,BodyTimeoutError } from './validation.mjs';
 import { keyedHash,sameDigest } from './security.mjs';
 
 const CONTACT_ORIGIN='https://timesaverautomate.com';
@@ -65,19 +65,25 @@ export async function handleContact(request,env,transport=fetch){
       if(!limited.success)return contactJSON({available:false,message:'Aguarde um minuto e volte a tentar.'},429,{'Retry-After':'60'});
       return contactJSON({available:true,version:'direct-email-v1',token:await issueContactToken(env)});
     }
+    const rateLimited=()=>contactJSON({message:'Foram feitas demasiadas tentativas. Aguarde um minuto antes de tentar novamente.'},429,{'Retry-After':'60'});
+    const local=await env.FORM_IP_RATE.limit({key:source});
+    if(!local.success)return rateLimited();
     if(request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()!=='application/json')return contactJSON({message:'Formato de pedido inválido.'},415);
     const key=request.headers.get('Idempotency-Key');
     if(!key||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(key))return contactJSON({message:'Reabra o formulário e tente novamente.'},400);
-    const local=await env.FORM_IP_RATE.limit({key:source});
-    const edge=await env.FORM_EDGE_RATE.limit({key:'time-saver-contact'});
-    if(!local.success||!edge.success)return contactJSON({message:'Foram feitas demasiadas tentativas. Aguarde um minuto antes de tentar novamente.'},429,{'Retry-After':'60'});
     let body;
-    try{body=await readBoundedJSON(request);}catch(error){return contactJSON({message:error instanceof RangeError?'O pedido excede o tamanho permitido.':'Não foi possível ler o pedido.'},error instanceof RangeError?413:400);}
+    try{body=await readBoundedJSON(request);}catch(error){
+      if(error instanceof BodyTimeoutError)return contactJSON({message:'A transmissão demorou demasiado. Os campos foram mantidos; verifique a ligação e tente novamente.'},408);
+      return contactJSON({message:error instanceof RangeError?'O pedido excede o tamanho permitido.':'Não foi possível ler o pedido.'},error instanceof RangeError?413:400);
+    }
     const {data,errors}=validateSubmission(body);
     if(Object.keys(errors).length)return contactJSON({message:'Verifique os campos assinalados.',errors},422);
     if(data.website)return contactJSON({message:'Não foi possível validar o pedido. Reabra o formulário.'},400);
     const ticket=await parseContactToken(data.token,env);
-    if(!ticket)return contactJSON({message:'O formulário expirou ou foi enviado demasiado depressa. Aguarde um momento; se o problema continuar, recarregue a página.'},403);
+    if(!ticket)return contactJSON({message:'A sessão do formulário precisa de ser renovada. Os campos foram mantidos. Aguarde a renovação e confirme novamente o envio.',refreshToken:true},403);
+    // Pedidos bloqueados ou inválidos nunca consomem o orçamento dos restantes visitantes.
+    const edge=await env.FORM_EDGE_RATE.limit({key:'time-saver-contact'});
+    if(!edge.success)return rateLimited();
     // O mesmo ticket/chave produz sempre a mesma referência, data e corpo, sem registo local.
     const fingerprint=await keyedHash(env.SECURITY_HMAC_KEY,'contact-send:'+ticket.nonce+':'+key.toLowerCase());
     const reference='TS-'+fingerprint.slice(0,20).toUpperCase();

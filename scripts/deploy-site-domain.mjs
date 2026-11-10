@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
+import { hardenZoneTLS } from './zone-security.mjs';
 
 const DOMAIN='timesaverautomate.com';
 const HOSTS=[DOMAIN,'www.'+DOMAIN];
@@ -106,18 +107,28 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
     }
     async function verify(expectHsts) {
       try {
+        function secure(response){
+          const h=response.headers,policy=h.get('Content-Security-Policy')||'';
+          return h.get('X-Time-Saver-Edge')==='1' && h.get('X-Frame-Options')==='DENY'
+            && h.get('X-Content-Type-Options')==='nosniff' && h.get('Referrer-Policy')==='strict-origin-when-cross-origin'
+            && h.get('Cross-Origin-Opener-Policy')==='same-origin' && h.get('Cross-Origin-Resource-Policy')==='same-origin'
+            && !h.has('Set-Cookie') && !h.has('Access-Control-Allow-Origin') && !h.has('Access-Control-Allow-Credentials')
+            && policy.includes("frame-ancestors 'none'") && policy.includes("object-src 'none'")
+            && policy.includes("require-trusted-types-for 'script'")
+            && (!expectHsts||h.get('Strict-Transport-Security')==='max-age=31536000');
+        }
         const root=await fetcher('https://'+DOMAIN+'/',{redirect:'manual',signal:AbortSignal.timeout(15_000)});
         const body=await root.text();
-        if(root.status!==200 || root.headers.get('X-Time-Saver-Edge')!=='1'
-          || !root.headers.get('Content-Security-Policy')?.includes("frame-ancestors 'none'")
-          || (!formRequested&&/<(?:form|input|textarea|select)\b/i.test(body)) || body.includes('="/time-saver/')
-          || (expectHsts && root.headers.get('Strict-Transport-Security')!=='max-age=31536000'))return false;
+        if(root.status!==200 || !secure(root)
+          || (!formRequested&&/<(?:form|input|textarea|select)\b/i.test(body)) || body.includes('="/time-saver/'))return false;
         if(formRequested){
           const status=await fetcher('https://'+DOMAIN+'/api/form-status',{redirect:'manual',headers:{Origin:'https://'+DOMAIN},signal:AbortSignal.timeout(15_000)});
-          const info=await status.json();if(!status.ok||info.available!==true||info.version!=='direct-email-v1')return false;
+          const info=await status.json();
+          if(!status.ok||!secure(status)||status.headers.get('Cache-Control')!=='no-store'
+            || info.available!==true||info.version!=='direct-email-v1')return false;
         }
         const www=await fetcher('https://www.'+DOMAIN+'/',{redirect:'manual',signal:AbortSignal.timeout(15_000)});
-        return www.status===308 && www.headers.get('Location')==='https://'+DOMAIN+'/';
+        return www.status===308 && secure(www) && www.headers.get('Location')==='https://'+DOMAIN+'/';
       }catch{return false;}
     }
     let verified=false;
@@ -132,7 +143,8 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
       if(await verify(true)){verified=true;break;}
       if(i<5)await sleep(2_000);
     }
-    return {configured:true,verified,installed,attached,contactApiConfigured:formRequested&&verified,
+    const zoneTLS=verified?await hardenZoneTLS({zoneId:domains.find(d=>d.hostname===DOMAIN)?.zone_id,cf}):{verified:false,changed:false,code:'https_not_verified'};
+    return {configured:true,verified,installed,attached,contactApiConfigured:formRequested&&verified,zoneTLS,
       code:verified?(formRequested?'domain_and_contact_api_verified':'domain_and_security_verified'):'hsts_verification_pending'};
   }catch(error){return {configured:attached.length>0,verified:false,installed,attached,
     code:error instanceof DomainError?error.code:'domain_setup_failed',

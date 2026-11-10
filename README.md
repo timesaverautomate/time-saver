@@ -45,6 +45,8 @@ Para verificar num ambiente de desenvolvimento na nuvem, com Node 24:
 
 HTTPS, HSTS, CSP, antienquadramento, validação de origem e campos no servidor, limite de 16 KiB, honeypot, ticket assinado, limites nativos de submissão e idempotência do Resend. Sem login, registo, anexos, pagamentos, chatbot, analítica ou recursos externos no navegador. Os contadores Cloudflare são aproximados por localização; não constituem um limite mundial estrito. A idempotência protege a repetição da mesma tentativa durante a janela documentada; não identifica pedidos iguais iniciados em páginas novas.
 
+Consulte também a [revisão de segurança e respetivos limites](docs/SEGURANCA.md).
+
 ## Informação jurídica
 
 O titular pediu que não fossem publicados nome legal, NIF ou morada. Esses dados não foram inventados. As páginas publicadas descrevem o funcionamento e identificam o contacto de privacidade; **a identificação jurídica do prestador continua incompleta**. Não se declara conformidade garantida. As minutas com marcadores permanecem em `public/` para futura conclusão e não são publicadas no modo `contact`. O modo `production` e a indexação continuam bloqueados pelo preflight jurídico.
