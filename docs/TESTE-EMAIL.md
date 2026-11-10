@@ -18,18 +18,28 @@ O valor fica guardado como segredo do repositório e é disponibilizado apenas a
 1. Abra Actions no repositório.
 2. Escolha Testar envio de email.
 3. Clique em Run workflow, selecione main e confirme Run workflow.
-4. Abra a execução e o passo Enviar teste para o titular da conta Resend.
+4. Abra a execução e o passo Enviar teste para o titular da conta Resend e registar resultado.
 5. Se o serviço aceitar o envio, aparece accepted: true e um identificador do fornecedor. Confirme a mensagem no Gmail e na pasta de spam antes de considerar a receção validada.
 
 O teste usa o remetente onboarding@resend.dev e o destinatário fixo timesaverautomate@gmail.com. O Resend só permite este remetente de teste para o email da própria conta. Não há envio para visitantes nem respostas automáticas. A referência e o corpo mantêm-se estáveis nas execuções do mesmo dia UTC para aplicar a idempotência do fornecedor.
 
-O workflow só é executado manualmente por um operador autorizado. Não é executado por submissões públicas nem por pull requests. A chave não é impressa; perante falha, são mostradas apenas mensagens de diagnóstico e, quando disponível, o código HTTP.
+O workflow pode ser executado manualmente ou quando há alterações aos ficheiros do próprio diagnóstico na branch main. Não é executado por submissões públicas nem por pull requests. Tem permissão de leitura de código e de escrita do estado do commit para permitir acompanhar o resultado. A chave é usada apenas no passo do teste e não é impressa; perante falha, são mostradas apenas mensagens de diagnóstico e, quando disponível, o código HTTP.
+
+## Resultado confirmado — 10 de novembro de 2026
+
+- Execução GitHub Actions: https://github.com/usertechsitee/time-saver/actions/runs/42829562752
+- Resultado do fornecedor: accepted: true.
+- Referência: time-saver-setup-2026-11-10.
+- Destinatário: timesaverautomate@gmail.com.
+- Receção efetiva: confirmada pelo titular na caixa de entrada nesta conversa.
+- Nenhum pedido comercial ou dado de visitante foi utilizado no diagnóstico.
+- A chave continua protegida no GitHub Actions e não foi transferida para o navegador nem para o alojamento do site.
 
 ## Âmbito e configurações pendentes
 
 Guardar um segredo em GitHub Actions não configura automaticamente o segredo de produção do Sites/Cloudflare. Este passo permite testar a conta Resend de forma protegida enquanto não existe um domínio próprio.
 
-O formulário comercial mantém-se desativado. A ativação continua a depender de um remetente de produção verificado, configuração do segredo no alojamento, armazenamento técnico de proteção, dados legais completos e validação real do fluxo. Não foi enviado qualquer email durante a preparação deste procedimento.
+O formulário comercial mantém-se desativado. A ativação continua a depender de um remetente de produção verificado, configuração do segredo no alojamento, armazenamento técnico de proteção, dados legais completos e validação real do fluxo. Foi realizado um teste real do serviço de email, com o resultado documentado abaixo. Este teste não equivale a uma submissão através do formulário do website.
 
 Referências oficiais:
 
