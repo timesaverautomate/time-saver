@@ -61,6 +61,8 @@ Referência do fornecedor: https://resend.com/docs/dashboard/domains/introductio
 
 ## 3. Criar o armazenamento técnico no Cloudflare
 
+O percurso recomendado está agora em [Instalação automática](INSTALACAO-AUTOMATICA.md): o workflow cria/reutiliza a base, aplica migrações, instala a API desativada e configura os segredos. As instruções manuais abaixo são uma alternativa técnica; não é necessário executar ambos os percursos.
+
 1. Use uma conta Cloudflare e mantenha o plano gratuito se este cobrir a necessidade. Não foi subscrito qualquer plano.
 2. Em Workers & Pages / D1, crie uma base chamada time-saver-security. Quando disponível, escolha jurisdição UE. O comando oficial equivalente num terminal de gestão na nuvem é npx --yes wrangler@4.160.0 d1 create time-saver-security --jurisdiction eu. Confirmar condições e localização efetiva: isto não garante que todos os acessos dos fornecedores ocorram na UE.
 3. Abra a consola SQL dessa base. Execute, por ordem, as instruções de migrations/0001_security.sql. Estas criam duas tabelas técnicas e os índices. Não crie tabelas de pedidos.
@@ -70,6 +72,8 @@ Referência do fornecedor: https://resend.com/docs/dashboard/domains/introductio
 O esquema de migrations/ é utilizado pelo Wrangler em instalações posteriores. Se o esquema inicial tiver sido criado pela consola, a migração CREATE IF NOT EXISTS pode ser aplicada pelo Wrangler para registar o seu estado. Futuras alterações exigem novas migrações, nunca a modificação retroativa de migrações aplicadas.
 
 ## 4. Instalar apenas o backend na Cloudflare
+
+Consulte primeiro a instalação automática. O nome usado por esse workflow é **time-saver-quotes**; o ficheiro wrangler.jsonc da entrega manual conserva o nome original **time-saver**. Não instale duas APIs por engano.
 
 O website fica no GitHub Pages, conforme solicitado. A Cloudflare executa apenas a API de orçamento. Esta sessão não dispõe de ligação à conta Cloudflare; não se declara que o Worker ou os segredos já estejam instalados.
 

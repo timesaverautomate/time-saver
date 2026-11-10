@@ -62,6 +62,10 @@ GitHub Pages sozinho não oferece a mesma configuração de cabeçalhos que o Wo
 
 Não foram adicionados pixels, analítica, publicidade ou desafios externos. Se forem acrescentadas tecnologias de proteção no navegador, avaliar acessibilidade e privacidade e rever o inventário de cookies real.
 
+## Instalação automática preparada
+
+O workflow cloudflare-backend.yml instala apenas a API desativada, sem depender de publicar o frontend comercial. Requer uma credencial Cloudflare guardada em Actions Secrets, que não está disponível pelo simples facto de o titular autorizar a ação no chat. O procedimento e as permissões mínimas estão em [INSTALACAO-AUTOMATICA.md](INSTALACAO-AUTOMATICA.md). O workflow não altera DNS nem regras Cloudflare.
+
 ## Email e formulário
 
 O teste Resend para timesaverautomate@gmail.com foi aceite e a receção foi confirmada pelo titular. O remetente resend.dev serviu apenas para esse teste.

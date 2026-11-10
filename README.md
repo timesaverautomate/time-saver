@@ -11,6 +11,7 @@ O repositório foi transferido para **timesaverautomate/time-saver**. O domínio
 1. Leia [o guia de entrega e ativação](docs/ENTREGA.md): explica os passos pelo navegador, sem terminal no PC.
 2. Complete [a revisão de privacidade e operação](docs/PRIVACIDADE-E-OPERACAO.md).
 3. Consulte [as verificações realizadas e pendentes](docs/VALIDACAO.md).
+4. Para instalar o backend pelo GitHub, siga [a instalação automática na Cloudflare](docs/INSTALACAO-AUTOMATICA.md). O instalador mantém o envio desativado e requer uma credencial de gestão guardada diretamente em Actions Secrets.
 
 O destinatário indicado é **timesaverautomate@gmail.com**. É configurado exclusivamente no servidor. Falta verificar o domínio de envio e configurar no backend a credencial já guardada em GitHub Actions. Não é pedida a palavra-passe do Gmail.
 

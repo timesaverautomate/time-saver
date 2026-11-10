@@ -13,3 +13,4 @@ work/
 *.log
 __pycache__/
 *.pyc
+.time-saver-cloudflare.json

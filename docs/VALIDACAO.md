@@ -1,5 +1,7 @@
 # Verificações realizadas e pendentes
 
+> Preparação adicional: 37 testes locais aprovados, incluindo seis testes do instalador Cloudflare. Verificam bloqueio antes de chamadas externas sem credenciais, destino main/repositório, preservação de HMAC, recusa de Worker alheio ou ativo, jurisdição da base, CORS restrito e ausência de valores secretos nos resultados. O Wrangler 4.160.0 também compilou o Worker em modo dry-run, sem publicar ou criar recursos. A instalação real continua dependente de acesso Cloudflare e do resultado do novo workflow; não confundir os testes com esse acesso.
+
 > Atualização verificada em GitHub Actions: 31 testes aprovados e construção estática concluída. A auditoria do commit 4ff59cec4ad8c2c564a56a92c536c135f42ea112 percorreu 13 commits e 68 blobs de texto sem encontrar os padrões de segredos procurados. É uma pesquisa heurística, não uma garantia absoluta. [Execução e resultados](https://github.com/timesaverautomate/time-saver/actions/runs/42841836621).
 
 > Atualização após intervenção do titular: repositório confirmado público e API Pages respondeu 200 com build_type workflow e https_enforced true. Ainda sem domínio personalizado (cname null); o URL do site devolveu 404, pelo que não se declara publicação concluída. As consultas DNS não devolveram A para a raiz nem CNAME para www. Nenhum registo DNS ou regra Cloudflare foi alterado.
