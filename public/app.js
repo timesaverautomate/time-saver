@@ -70,9 +70,11 @@ if (form) {
   const submit = form.querySelector('[type=submit]');
   const submitLabel = submit.querySelector('span');
   const availability = document.querySelector('#form-availability');
+  const retryAvailability = document.querySelector('#retry-availability');
   const result = document.querySelector('#form-result');
   const description = form.elements.description;
   let token = '', available = false, busy = false, sent = false;
+  let checkingAvailability = false, sessionRefreshNeeded = false;
   let submissionKey = '', lastSignature = '';
   let tokenReadyTimer;
   const originalLabel = submitLabel.textContent;
@@ -145,29 +147,46 @@ if (form) {
     result.append(list);
   }
   async function refreshToken() {
+    if(checkingAvailability)return false;
+    checkingAvailability=true;
     available = false; submit.disabled = true;
     clearTimeout(tokenReadyTimer);
-    if (formDisabledByHosting) {
-      availability.hidden = false;
-      availability.textContent = 'O formulário ainda não está disponível. O envio de pedidos está temporariamente desativado.';
-      return;
-    }
+    if(retryAvailability)retryAvailability.disabled=true;
     try {
+      availability.hidden=false;
+      if (formDisabledByHosting) {
+        availability.textContent = 'O formulário ainda não está disponível. O envio de pedidos está temporariamente desativado.';
+        if(retryAvailability)retryAvailability.hidden=true;
+        return false;
+      }
+      availability.textContent='A verificar a disponibilidade do formulário…';
       const response = await fetch(apiBase+'/api/form-status',{cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(12_000)});
       const status = await response.json();
       if (!response.ok || !status.available || typeof status.token !== 'string') throw new Error(status.message || 'O formulário está temporariamente indisponível.');
       token = status.token;
+      if(sessionRefreshNeeded){submissionKey='';lastSignature='';sessionRefreshNeeded=false;}
       availability.hidden = true;
+      if(retryAvailability)retryAvailability.hidden=true;
       // A proteção temporal do servidor não deve impedir uma nova tentativa imediata.
       tokenReadyTimer = setTimeout(()=>{available=true;submit.disabled=busy || sent;},1600);
+      return true;
     } catch (error) {
       token = '';
       availability.hidden = false;
       availability.textContent = error.name === 'TimeoutError' || error.name === 'TypeError'
-        ? 'Não foi possível verificar o serviço. Recarregue a página para voltar a tentar.'
+        ? 'Não foi possível verificar o serviço. Os campos foram mantidos; volte a verificar quando a ligação estiver disponível.'
         : error.message;
+      if(retryAvailability)retryAvailability.hidden=false;
+      return false;
+    } finally {
+      checkingAvailability=false;
+      if(retryAvailability)retryAvailability.disabled=busy || sent;
     }
   }
+  retryAvailability?.addEventListener('click',async()=>{
+    if(busy || sent || checkingAvailability || formDisabledByHosting)return;
+    if(await refreshToken())showMessage('O serviço está novamente disponível e os campos foram mantidos. Verifique os dados e carregue em Enviar pedido de orçamento. O envio não foi repetido automaticamente.');
+  });
   function collect() {
     const data = {};
     ['name','email','description','company','service','tools','deadline','budget','website','goal','frequency','startingPoint','specifics'].forEach(name=>{data[name]=(form.elements[name]?.value||'').trim().normalize('NFC');});
@@ -194,6 +213,7 @@ if (form) {
       submissionKey = crypto.randomUUID(); lastSignature = signature;
     }
     busy = true; submit.disabled = true;
+    if(retryAvailability)retryAvailability.disabled=true;
     editableFields.forEach(field=>{field.disabled=true;});
     form.setAttribute('aria-busy','true'); submitLabel.textContent = 'A enviar o pedido…';
     result.replaceChildren();
@@ -210,15 +230,16 @@ if (form) {
         submitLabel.textContent = 'Pedido aceite para envio';
         form.reset();updateCounter();updateServiceContext();
         lastSignature='';submissionKey='';token='';
+        if(retryAvailability)retryAvailability.hidden=true;
         const another=document.querySelector('#new-request');if(another)another.hidden=false;
       } else if (payload.errors) showErrors(payload.errors);
       else {
         showMessage(payload.message || 'Não foi possível confirmar o envio. Os dados foram mantidos; tente novamente.');
         if (payload.renewKey) submissionKey = '';
         if (payload.refreshToken) {
+          sessionRefreshNeeded=true;
           await refreshToken();
           if(token){
-            submissionKey='';lastSignature='';
             showMessage('A sessão foi renovada e os campos foram mantidos. Verifique os dados e volte a carregar em Enviar pedido de orçamento. O envio não foi repetido automaticamente.');
           }
         }
@@ -229,11 +250,14 @@ if (form) {
       busy = false; form.setAttribute('aria-busy','false');
       editableFields.forEach(field=>{field.disabled=false;});
       submit.disabled = !available || sent;
+      if(retryAvailability)retryAvailability.disabled=checkingAvailability || sent;
       if (!sent) submitLabel.textContent = originalLabel;
     }
   });
   document.querySelector('#new-request')?.addEventListener('click',async()=>{
+    if(busy || checkingAvailability)return;
     sent=false;submissionKey='';lastSignature='';token='';result.replaceChildren();
+    sessionRefreshNeeded=false;
     document.querySelector('#new-request').hidden=true;submitLabel.textContent=originalLabel;
     await refreshToken();focusField('service');
   });

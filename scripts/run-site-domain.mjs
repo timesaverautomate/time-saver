@@ -49,4 +49,4 @@ if(result.verified){
     'time-saver/transport-tls');}
   catch{console.error('Não foi possível registar a verificação de TLS.');process.exitCode=1;}
 }
-if(!result.verified)process.exitCode=1;
+if(result.verified!==true||result.transportTLS?.verified!==true)process.exitCode=1;

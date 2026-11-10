@@ -68,3 +68,24 @@ O instalador tenta consultar o TLS mínimo da zona e subir versões 1.0/1.1 para
 A configuração e manutenção de MFA/passkeys, acessos à caixa Gmail e contas de gestão, restrição dos tokens e regras de proteção do repositório não podem ser confirmadas apenas pelo código. Confirmar em cada conta e rever periodicamente acessos. Em GitHub Settings → Branches/Rulesets, avaliar proteção de main e impedir force push; em Settings → Code security, confirmar as proteções disponíveis no plano. Não bloquear a manutenção com regras que o titular não consiga cumprir.
 
 A auditoria de padrões não identifica todos os tipos possíveis de segredos; não elimina a necessidade de rodar uma credencial se alguma exposição for confirmada. Não houve testes destrutivos, scans de elevado volume ou alteração de planos. Continuam necessárias atualizações e verificação após mudanças. A retenção Resend/Gmail e as pendências jurídicas mantêm-se descritas em [FORMULARIO-EMAIL.md](FORMULARIO-EMAIL.md).
+
+
+## Segunda revisão aprofundada do código e navegação
+
+A revisão posterior voltou a procurar formas de contornar origem, tokens, idempotência, limites, validação, DOM/CSP e publicação. Não identificou um caminho ativo para executar código introduzido nos campos, escolher destinatários, executar comandos/SQL ou obter segredos pelo website. Esta conclusão aplica-se ao código e testes observados, sem constituir garantia de ausência de outras falhas.
+
+Foram demonstrados localmente e corrigidos três pontos:
+
+1. **Rotação IPv6 na mesma rede:** antes, oito endereços distintos de um /64 produziam oito limites separados. Agora partilham o mesmo identificador HMAC de rede. No teste com limitador determinístico, os oito pedidos produziram cinco aceites e três rejeitados; os contadores reais Cloudflare mantêm o comportamento aproximado já documentado. Outro /64 tem um limite independente. IPv4 mapeado partilha o limite do IPv4 correspondente; IPv4 canónico conserva a chave anterior. Endereços inválidos, portas e zone suffixes falham de forma fechada.
+2. **Recuperação do formulário:** uma falha ao consultar ou renovar o serviço deixava o botão de envio bloqueado sem controlo para recuperar. O botão “Voltar a verificar o serviço” permite nova consulta, preserva os campos e não envia automaticamente. Cliques concorrentes são bloqueados. Falhas ambíguas de envio continuam a reutilizar a mesma tentativa, sem renovar o ticket por engano.
+3. **Publicação após falha TLS:** o job de domínio agora falha também se o handshake não estiver verificado. A publicação Pages exige API JSON sem cache, disponível e com versão/ticket válidos, e o teste independente de TLS aprovado antes de publicar o formulário.
+
+**87 testes automáticos passaram** nesta revisão, incluindo sete de origem de rede e seis do bloqueio de publicação. O motor workerd executou o backend atualizado com fornecedor simulado. Nenhum teste de rotação de IP enviou emails reais ou tentou alterar o IP observado pela Cloudflare de produção.
+
+Navegação real em Chromium a **320, 768 e 1440 px**: secções, menu móvel, Escape, teclado, demonstração, FAQ e três páginas informativas aprovados; sem deslocação horizontal ou erros JavaScript. Os recursos públicos foram obtidos com TLS validado pelo cliente HTTP e fornecidos ao Chromium devido ao proxy de inspeção do ambiente. A única submissão de teste por tamanho foi intercetada antes de contactar o servidor de email: respostas com HTML/JavaScript apareceram como texto, sem elementos injetados ou execução. Trusted Types bloqueou HTML dinâmico; não se observaram cookies, armazenamento persistente, service workers ou recursos externos. O formulário ficou desativado sem JavaScript e o navegador bloqueou a página dentro de um iframe externo.
+
+A recuperação foi ainda testada com API simulada a **375 e 1440 px**: falha inicial 429/503, renovação seguida de falha, novo pedido com serviço indisponível, cliques concorrentes e resposta ambígua conservaram dados e idempotência nos termos esperados. Não se enviaram emails nestes testes.
+
+A publicação desta ronda e a confirmação das alterações no domínio ficam registadas após execução. A revisão anterior de entrega efetiva de email continua documentada acima; uma consulta de disponibilidade não substitui esse teste.
+
+Os workflows de prospeção/CRM existentes no repositório não recebem os pedidos do formulário. A revisão identificou nesses componentes separados Actions referenciadas por tags e instalação de dependências Python sem bloqueio de versões/hashes. Esses componentes foram preservados nesta revisão do website e requerem uma revisão própria se se pretender alargar a avaliação a todo o CRM. O website ativo não instala essas dependências nem usa esses workflows para publicar ou enviar pedidos.

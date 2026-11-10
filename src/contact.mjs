@@ -32,11 +32,33 @@ function contactOrigin(request,required){
   return url.origin===CONTACT_ORIGIN && (!required&&!origin || origin===CONTACT_ORIGIN)
     && (!site||site==='same-origin');
 }
+export function contactNetworkSource(ip){
+  if(typeof ip!=='string'||!ip||ip.length>64||!/^[a-f0-9:.]+$/i.test(ip))throw Error('edge_ip_invalid');
+  if(!ip.includes(':')){
+    const octets=ip.split('.');
+    if(octets.length!==4||octets.some(part=>!/^(?:0|[1-9][0-9]{0,2})$/.test(part)||Number(part)>255))throw Error('edge_ip_invalid');
+    return ip;
+  }
+  // URL valida/canonicaliza IPv6; expandimos apenas a representação já validada.
+  let canonical;
+  try{canonical=new URL('http://['+ip+']/').hostname.slice(1,-1);}catch{throw Error('edge_ip_invalid');}
+  const halves=canonical.split('::');
+  const left=halves[0]?halves[0].split(':'):[];
+  const right=halves.length===2&&halves[1]?halves[1].split(':'):[];
+  const words=halves.length===2?[...left,...Array(8-left.length-right.length).fill('0'),...right]:left;
+  if(words.length!==8||words.some(word=>!/^[0-9a-f]{1,4}$/.test(word)))throw Error('edge_ip_invalid');
+  const values=words.map(word=>parseInt(word,16));
+  // IPv4 mapeado partilha o limite do endereço IPv4, em vez de todo o prefixo ::/64.
+  if(values.slice(0,5).every(value=>value===0)&&values[5]===0xffff){
+    return [values[6]>>>8,values[6]&255,values[7]>>>8,values[7]&255].join('.');
+  }
+  // A rotação de endereços na mesma rede IPv6 não cria um limite novo.
+  return 'ipv6/64:'+words.slice(0,4).map(word=>word.padStart(4,'0')).join(':');
+}
 async function contactSource(request,env){
-  const ip=request.headers.get('CF-Connecting-IP');
-  if(!ip||ip.length>64||!/^[a-f0-9:.]+$/i.test(ip))throw Error('edge_ip_missing');
+  const source=contactNetworkSource(request.headers.get('CF-Connecting-IP'));
   const day=Math.floor(Date.now()/86400000);
-  return keyedHash(env.SECURITY_HMAC_KEY,'contact-rate:'+day+':'+ip);
+  return keyedHash(env.SECURITY_HMAC_KEY,'contact-rate:'+day+':'+source);
 }
 export async function issueContactToken(env,now=Date.now()){
   const value=now+'.'+crypto.randomUUID();

@@ -43,9 +43,9 @@ Para verificar num ambiente de desenvolvimento na nuvem, com Node 24:
 
 ## Segurança e limites
 
-HTTPS, HSTS, CSP, antienquadramento, validação de origem e campos no servidor, limite de 16 KiB, honeypot, ticket assinado, limites nativos de submissão e idempotência do Resend. Sem login, registo, anexos, pagamentos, chatbot, analítica ou recursos externos no navegador. Os contadores Cloudflare são aproximados por localização; não constituem um limite mundial estrito. A idempotência protege a repetição da mesma tentativa durante a janela documentada; não identifica pedidos iguais iniciados em páginas novas.
+HTTPS, HSTS, CSP, antienquadramento, validação de origem e campos no servidor, limite de 16 KiB, honeypot, ticket assinado, limites nativos de submissão e idempotência do Resend. Sem login, registo, anexos, pagamentos, chatbot, analítica ou recursos externos no navegador. Os limites agrupam os endereços IPv6 da mesma rede /64, e endereços IPv4 mapeados usam o mesmo limite do IPv4 correspondente. Os contadores Cloudflare são aproximados por localização; não constituem um limite mundial estrito. A idempotência protege a repetição da mesma tentativa durante a janela documentada; não identifica pedidos iguais iniciados em páginas novas.
 
-Consulte também a [revisão de segurança e respetivos limites](docs/SEGURANCA.md): 74 testes aprovados e proteções publicadas. **TLS confirmado após a alteração na Cloudflare:** versões 1.0/1.1 recusadas no handshake e 1.2/1.3 disponíveis com certificado e hostname validados. A pendência de TLS foi resolvida e verificada em 10/11/2026 às 17:33 UTC.
+Consulte também a [revisão de segurança e respetivos limites](docs/SEGURANCA.md): 87 testes aprovados na revisão aprofundada; ver relatório para estado da publicação. **TLS confirmado após a alteração na Cloudflare:** versões 1.0/1.1 recusadas no handshake e 1.2/1.3 disponíveis com certificado e hostname validados. A pendência de TLS foi resolvida e verificada em 10/11/2026 às 17:33 UTC.
 
 ## Informação jurídica
 
