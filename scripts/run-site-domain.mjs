@@ -23,7 +23,8 @@ let result;
 try{
   const modules=await readSiteModules();
   const config=JSON.parse(await readFile(new URL('../config/domain.json',import.meta.url),'utf8'));
-  result=await deploySiteDomain({env:{...env,FORM_ENABLED:config.quoteCollectionEnabled===true?'true':'false'},
+  result=await deploySiteDomain({env:{...env,FORM_ENABLED:config.quoteCollectionEnabled===true?'true':'false',
+    QUOTE_CRM_ENABLED:config.quoteSheetSyncEnabled===true?'true':'false'},
     source:modules['proxy.mjs'],modules,mask:value=>console.log('::add-mask::'+value)});
 }
 catch{result={configured:false,verified:false,code:'domain_setup_failed'};}
