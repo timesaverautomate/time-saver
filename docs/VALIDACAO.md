@@ -2,7 +2,7 @@
 
 Data: 10/11/2026. Arquitetura ativa: GitHub Pages + Worker Cloudflare `time-saver-edge` + Resend + Gmail, sem base de dados de pedidos. Os resultados de versões anteriores com D1 estão no histórico Git e não descrevem o fluxo atual.
 
-**Atualização de segurança, 10/11/2026 às 17:33 UTC:** 74 testes aprovados; TLS 1.0/1.1 recusados e TLS 1.2/1.3 confirmados com certificado válido após alteração na Cloudflare. Domínio e API disponíveis. [Relatório e evidência da reexecução](SEGURANCA.md).
+**Atualização da revisão aprofundada, 10/11/2026:** 87 testes aprovados; melhorias de rate limit IPv6, recuperação do formulário e bloqueio de publicação sem TLS validado. Navegação real a 320/768/1440 px aprovada; código publicado comparado por hash. Novo pedido sintético recebido na caixa de entrada, sem duplicado na repetição. TLS mínimo 1.2 confirmado pela API e pelo teste de handshake. [Relatório e evidências](SEGURANCA.md).
 
 ## Verificação inicial do formulário, antes da publicação
 
