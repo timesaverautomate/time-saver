@@ -62,7 +62,7 @@ O frontend está preparado para GitHub Pages, com recursos locais e caminhos ada
 
     npm run build:pages
 
-O workflow de Pages constrói uma revisão, audita padrões de segredos no histórico e verifica a configuração de alojamento. A publicação comercial permanece bloqueada pelos marcadores legais. O titular autorizou a visibilidade pública; essa autorização não altera automaticamente as definições do repositório.
+O workflow de Pages constrói uma revisão, audita padrões de segredos no histórico e verifica a configuração de alojamento. A publicação comercial permanece bloqueada pelos marcadores legais. O titular tornou o repositório público e ativou Pages com origem GitHub Actions, confirmado pela API. Falta a primeira publicação: o endereço do site ainda devolve 404 e o bloqueio de dados legais permanece ativo.
 
 O backend é separado, porque GitHub Pages não executa funções de servidor. O Worker suporta API dedicada, CORS para a origem exata, validação, limites partilhados e proteção contra duplicados. Na exportação estática, o formulário permanece desativado até configurar um endpoint HTTPS real em QUOTE_API_ORIGIN e o backend confirmar disponibilidade. A chave Resend fica no servidor.
 

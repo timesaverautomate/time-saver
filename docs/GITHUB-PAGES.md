@@ -13,11 +13,11 @@ O endereço só deve ser apresentado como ativo depois de publicação concluíd
 3. Autorizar a aplicação GitHub a aceder ao repositório time-saver. Uma transferência de propriedade não concede esse acesso automaticamente.
 4. No GitHub, abrir https://github.com/timesaverautomate/time-saver/settings/pages e selecionar GitHub Actions como Source, se a conta e a visibilidade do repositório forem elegíveis.
 
-Não é necessário partilhar palavras-passe ou chaves com o chat. A ligação disponível no início desta preparação só reconhecia techusersite e usertechsitee e devolvia 404 para o novo destino. A associação deve ser novamente verificada após a autorização.
+Concluído: a conta timesaverautomate foi ligada e o acesso administrativo ao repositório foi confirmado. O titular tornou o repositório público e ativou Pages com origem GitHub Actions. A API Pages respondeu 200; ainda sem domínio personalizado ou deploy concluído. Não é necessário repetir a associação nem partilhar palavras-passe ou chaves com o chat.
 
 ## Plano e visibilidade
 
-No GitHub Free, Pages está disponível para repositórios públicos. Um repositório privado requer um plano compatível, como GitHub Pro. Não foi contratado um plano pago e não foi alterada a visibilidade.
+No GitHub Free, Pages está disponível para repositórios públicos. Um repositório privado requer um plano compatível, como GitHub Pro. Não foi contratado um plano pago. O titular autorizou e efetuou a alteração para público, confirmada pela API.
 
 Tornar o repositório público expõe o código, a documentação e o histórico e exige uma decisão explícita do titular. Os valores dos segredos GitHub Actions não são incluídos nos ficheiros da exportação.
 

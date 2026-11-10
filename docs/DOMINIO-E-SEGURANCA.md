@@ -1,16 +1,16 @@
 # Domínio e segurança — timesaverautomate.com
 
-O titular indicou timesaverautomate.com, com DNS na Cloudflare, e autorizou tornar público o repositório timesaverautomate/time-saver para usar GitHub Pages gratuito. Essa autorização não comprova que a visibilidade ou as definições de alojamento já tenham sido alteradas.
+O titular indicou timesaverautomate.com, com DNS na Cloudflare, e autorizou tornar público o repositório timesaverautomate/time-saver para usar GitHub Pages gratuito. Após a confirmação do titular, a leitura do repositório e da API Pages em 10 de novembro confirmou visibilidade pública e build_type workflow. Pages está ativado, com HTTPS obrigatório no endereço GitHub, mas ainda sem uma publicação bem-sucedida ou domínio personalizado associado.
 
 ## Estado confirmado e preparação
 
 Em 10 de novembro de 2026, os servidores DNS observados foram elle.ns.cloudflare.com e clark.ns.cloudflare.com. A consulta pública à raiz do domínio não devolveu A, AAAA, CNAME, MX, TXT ou CAA. Nenhum registo foi alterado nesta preparação.
 
-O acesso administrativo à nova conta/repositório GitHub foi confirmado. A integração permite editar código e workflows, mas não tem operações para alterar a visibilidade, ativar Pages ou gerir a zona Cloudflare. O acesso da linha de comandos pertence a outra conta e não abre este repositório privado.
+O acesso administrativo à nova conta/repositório GitHub foi confirmado. A integração permite editar código e workflows, mas não tem operações para alterar a visibilidade, ativar Pages ou gerir a zona Cloudflare. O acesso da linha de comandos pertence a outra conta; a leitura pública não confere autorização para mudar as definições administrativas.
 
 As ações oficiais foram fixadas em SHAs completos de releases verificadas. Os checkouts não persistem credenciais. O teste Resend só corre em main. O job de publicação tem apenas as permissões Pages/OIDC necessárias. Pull requests públicos não recebem a chave Resend.
 
-A execução [42841836621](https://github.com/timesaverautomate/time-saver/actions/runs/42841836621) aprovou 31 testes e verificou 13 commits/68 blobs de texto sem encontrar os padrões procurados. Confirmou Pages não configurado/acessível (HTTP 404) e omitiu a publicação. O repositório continuava privado na leitura após o workflow.
+A execução [42841836621](https://github.com/timesaverautomate/time-saver/actions/runs/42841836621) aprovou 31 testes e verificou 13 commits/68 blobs de texto sem encontrar os padrões procurados. Confirmou Pages não configurado/acessível (HTTP 404) e omitiu a publicação. O repositório continuava privado na leitura após esse workflow. Mais tarde, o titular alterou-o para público e ativou Pages: a nova consulta GET /repos/timesaverautomate/time-saver/pages respondeu HTTP 200, build_type workflow, cname null e https_enforced true. O endereço público do site ainda respondia 404; a publicação aguarda os dados legais. As consultas DNS à raiz e ao CNAME www continuavam sem registos de destino.
 
 O workflow Pages verifica padrões de credenciais no histórico Git completo sem imprimir os valores. A auditoria é heurística; não garante ausência de todos os tipos de segredo. Existem testes que verificam deteção de uma credencial removida do ficheiro atual mas ainda presente no histórico.
 
@@ -24,8 +24,8 @@ Rever a proteção de segredos e push protection disponibilizadas pelo GitHub e 
 
 ## Ordem de configuração segura
 
-1. Rever o resultado da auditoria; depois tornar o repositório público em Settings → General → Danger Zone → Change repository visibility.
-2. Em Settings → Pages do repositório, selecionar GitHub Actions como Source.
+1. Concluído: auditoria sem os padrões de segredo procurados e repositório tornado público pelo titular.
+2. Concluído: GitHub Actions selecionado como Source. Continua a faltar o deploy, bloqueado pelos dados legais por preencher.
 3. Na conta GitHub, verificar a propriedade do domínio em Settings → Pages usando o TXT exato fornecido pelo GitHub. O TXT é público e pode ser partilhado; não é uma chave de API.
 4. Guardar timesaverautomate.com como Custom domain no repositório antes de apontar o DNS.
 5. Configurar os registos abaixo, preservando registos existentes com outras finalidades.
@@ -69,6 +69,8 @@ O teste Resend para timesaverautomate@gmail.com foi aceite e a receção foi con
 Adicionar e verificar o domínio/subdomínio no painel Resend; aplicar SPF/DKIM exatos desse painel e avaliar DMARC/alinhamento. Não inventar chaves/seletores DKIM nem criar dois SPF no mesmo nome. A chave existente de envio não concede automaticamente gestão de domínios Resend ou DNS Cloudflare.
 
 O código suporta backend separado em modo API_ONLY, CORS de origem exata, preflight limitado e endpoint HTTPS explícito no cliente. GitHub Pages não executa esse backend. O formulário fica desativado até existir um backend adequado, segredo no servidor, remetente verificado, dados legais completos e teste real do fluxo. A chave não será incluída nos ficheiros públicos.
+
+O contacto de privacidade autorizado pelo titular é timesaverautomate@gmail.com e já foi aplicado na Política de Privacidade. O nome/denominação legal, NIF/NIPC, morada profissional e as condições dos fornecedores ainda não foram confirmados.
 
 ## Verificações pendentes
 

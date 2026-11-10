@@ -2,7 +2,7 @@
 
 ## Decisões de arquitetura
 
-O browser envia JSON para um endpoint da mesma origem. Não existem sessões, contas, ficheiros anexos ou fluxos de pagamento. O servidor valida, aplica limites e bloqueios e envia um email de texto através de Resend. Os pedidos completos não são gravados em D1.
+Na instalação GitHub Pages, o browser envia JSON para um endpoint HTTPS explicitamente configurado. A API separada valida a origem exata e aplica CORS restrito; isto não é uma proteção suficiente contra bots. O modo original da mesma origem continua suportado. Não existem sessões, contas, ficheiros anexos ou fluxos de pagamento. O servidor valida, aplica limites e bloqueios e envia um email de texto através de Resend. Os pedidos completos não são gravados em D1.
 
 O Resend é a integração implementada por suportar envio HTTP e chaves de idempotência. Não é apresentado como fornecedor integralmente sediado ou processado no EEE. Rever o DPA, as entidades, as regiões, a lista de subcontratantes, os acessos e as garantias internacionais antes da ativação. Se não for adequado, substituir o adaptador src/mail.mjs e repetir os testes, incluindo a semântica de idempotência do novo fornecedor.
 
@@ -42,10 +42,11 @@ O código não cria logs de aplicação com nomes, emails, IPs ou mensagens. Obs
 
 ## Fornecedores a confirmar
 
+- GitHub Pages: condições de alojamento, destinatários e metadados de rede, logs, acessos e garantias internacionais aplicáveis. Confirmar também a adequação do Pages à utilização comercial pretendida.
 - Cloudflare: DPA, entidades, subcontratantes, condições de localização, acesso administrativo, logs e eventuais transferências internacionais.
 - Resend: DPA, destinatários, retenção do conteúdo e metadados, acessos, subcontratantes e garantias de transferência.
 - Google/Gmail: a caixa indicada é Gmail. Não pressupor que uma conta pessoal disponibiliza os mesmos compromissos contratuais de uma conta empresarial. Verificar a posição contratual e a adequação; se necessário adotar uma caixa profissional com condições adequadas, alterando MAIL_TO no servidor.
-- Sites: a identificação do projeto é uma cópia de revisão sem email ativo. Se for utilizada uma versão privada da plataforma, avaliar também os tratamentos e tecnologias de acesso próprios dessa plataforma. Para alojar publicamente com o código completo, o guia principal usa Cloudflare Workers.
+- Sites: a identificação do projeto é uma cópia de revisão sem email ativo. Se for utilizada uma versão privada da plataforma, avaliar também os tratamentos e tecnologias de acesso próprios dessa plataforma. O destino escolhido pelo titular é GitHub Pages para o frontend e um Worker separado para a API.
 
 Preferir processamento no EEE quando adequado e confirmar também subcontratantes e acessos internacionais. Uma região europeia de infraestrutura ou de envio não basta para concluir que todo o tratamento fica no EEE.
 

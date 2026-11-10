@@ -9,5 +9,11 @@
   "customDomainVerified": false,
   "httpsVerified": false,
   "backendOrigin": null,
-  "commercialPublicationReady": false
+  "commercialPublicationReady": false,
+  "githubVisibility": "public",
+  "githubPagesConfigured": true,
+  "githubPagesBuildType": "workflow",
+  "privacyEmail": "timesaverautomate@gmail.com",
+  "lastVerifiedDate": "2026-11-10",
+  "githubPagesDeploymentVerified": false
 }
