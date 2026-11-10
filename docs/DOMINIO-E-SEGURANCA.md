@@ -1,5 +1,7 @@
 # Domínio e segurança — timesaverautomate.com
 
+> Configuração atual escolhida: [domínio através de um Worker de proteção](DOMINIO-PUBLICO.md), mantendo o GitHub Pages como origem independente e o site sem recolha de pedidos. O procedimento A/CNAME diretamente para Pages descrito no historial abaixo foi substituído; não aplicar os dois métodos ao mesmo tempo. O resultado da execução efetiva deve ser confirmado antes de assinalar o domínio como ligado.
+
 O titular indicou timesaverautomate.com, com DNS na Cloudflare, e autorizou tornar público o repositório timesaverautomate/time-saver para usar GitHub Pages gratuito. Após a confirmação do titular, a leitura do repositório e da API Pages em 10 de novembro confirmou visibilidade pública e build_type workflow. Pages está ativado, com HTTPS obrigatório no endereço GitHub, mas ainda sem uma publicação bem-sucedida ou domínio personalizado associado.
 
 ## Estado confirmado e preparação

@@ -21,5 +21,9 @@
   "githubPagesVerifiedURL": "https://timesaverautomate.github.io/time-saver/",
   "githubPagesVerifiedCommit": "c6bd04c635a46441b31276339bb446827e4689ee",
   "backendInstallationState": "blocked_d1_http_401",
-  "workersDevAccountRegistered": true
+  "workersDevAccountRegistered": true,
+  "domainDelivery": "github-pages-origin-cloudflare-worker",
+  "edgeWorker": "time-saver-edge",
+  "quoteCollectionEnabled": false,
+  "legalDataDeclinedByOwner": true
 }

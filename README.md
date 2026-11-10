@@ -72,3 +72,5 @@ As ações oficiais estão fixadas em SHAs completos. A configuração de cabeç
 A versão privada antiga no Sites mantém-se como referência de revisão enquanto o alojamento de destino está por concluir.
 
 Estado Cloudflare confirmado: a credencial permitiu registar o endereço de conta workers.dev em falta. A instalação parou depois com HTTP 401 ao aceder ao D1. Rever a permissão de conta D1: Edit e o âmbito da conta no token; não divulgar o valor. O Worker de orçamento ainda não está instalado nem operacional.
+
+O titular optou por não fornecer dados legais. O site público mantém-se como apresentação de pré-lançamento, sem recolha de pedidos. A ligação do domínio e os controlos HTTP passam a usar o Worker time-saver-edge em frente à origem GitHub Pages; consultar [o procedimento do domínio público](docs/DOMINIO-PUBLICO.md). Este Worker não usa D1 ou Resend.

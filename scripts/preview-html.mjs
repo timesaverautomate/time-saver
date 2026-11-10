@@ -5,7 +5,7 @@ const legalContent = {
     body:`<p>Esta versão apresenta a Time Saver e exemplos ilustrativos de automatização. Não disponibiliza um formulário nem recebe pedidos de orçamento.</p>
 <h2>Contacto de privacidade</h2><p>Para assuntos de proteção de dados relativos a este website, contacte ${contact}. Não envie dados sensíveis ou informação confidencial.</p>
 <h2>Funcionamento desta versão</h2><p>O código do site não inclui publicidade, pixels de marketing, analítica, contas de utilizador ou armazenamento persistente no navegador. Não são enviados dados de formulários para um serviço de email.</p>
-<p>As páginas são servidas pelo GitHub Pages. A infraestrutura de alojamento pode tratar metadados técnicos de acesso, incluindo o endereço IP, para disponibilização e segurança do serviço. Consulte a <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noreferrer">Política de Privacidade do GitHub</a> para conhecer os tratamentos desse fornecedor.</p>
+<p>Os ficheiros das páginas são alojados no GitHub Pages. No domínio timesaverautomate.com, a Cloudflare assegura a entrega e proteção através de um Worker que consulta essa origem por HTTPS. Estas infraestruturas podem tratar metadados técnicos de acesso, incluindo o endereço IP, para disponibilização e segurança do serviço. Consulte a <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noreferrer">Política de Privacidade do GitHub</a> para conhecer os tratamentos desse fornecedor. Consulte também a <a href="https://www.cloudflare.com/privacypolicy/" rel="noreferrer">Política de Privacidade da Cloudflare</a>.</p>
 <h2>Direitos e atualização</h2><p>Pode utilizar o contacto acima para questões ou pedidos relativos aos seus dados. Pode também reclamar à <a href="https://www.cnpd.pt/" rel="noreferrer">Comissão Nacional de Proteção de Dados</a>. A identificação completa do prestador e a informação sobre o tratamento dos pedidos serão disponibilizadas antes da ativação comercial.</p>`
   },
   'aviso-legal': {
@@ -18,7 +18,7 @@ const legalContent = {
   cookies: {
     title:'Cookies e tecnologias nesta versão',
     body:`<p>O código desta versão não cria cookies, não usa armazenamento persistente no navegador e não inclui publicidade, analítica ou pixels de marketing. Não existe formulário para preencher.</p>
-<p>O alojamento e a entrega das páginas são assegurados pelo GitHub Pages, que pode tratar metadados técnicos de acesso. Consulte também a <a href="/privacidade">informação de privacidade</a>.</p>
+<p>Os ficheiros são alojados no GitHub Pages; no domínio próprio, a Cloudflare intervém na entrega e proteção. Estas infraestruturas podem tratar metadados técnicos de acesso. O inventário de tecnologias deve ser revisto se forem ativados desafios no navegador ou outras funcionalidades da plataforma. Consulte também a <a href="/privacidade">informação de privacidade</a>.</p>
 <p>Não foi acrescentado um banner de consentimento decorativo. A introdução futura de ferramentas ou de serviços no navegador exige nova avaliação das tecnologias efetivamente utilizadas e, quando aplicável, a obtenção de consentimento antes da sua utilização.</p>`
   }
 };
