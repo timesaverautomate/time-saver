@@ -82,8 +82,18 @@ async function rows(access,fetcher){
   return all;
 }
 export async function verifyQuoteSheet(env,{fetcher=fetch,authorize=googleToken}={}){
-  const access=await authorize(env,fetcher);
-  const all=await rows(access,fetcher);
+  let access;
+  try{access=await authorize(env,fetcher);}
+  catch(error){
+    if(/^sheets_[a-z0-9_]+$/.test(error?.message||''))throw error;
+    throw Error('sheets_auth_runtime_'+(error?.name||'unknown').toLowerCase().replace(/[^a-z]/g,''));
+  }
+  let all;
+  try{all=await rows(access,fetcher);}
+  catch(error){
+    if(/^sheets_[a-z0-9_]+$/.test(error?.message||''))throw error;
+    throw Error('sheets_read_runtime_'+(error?.name||'unknown').toLowerCase().replace(/[^a-z]/g,''));
+  }
   return {ready:true,existingRows:all.length-1};
 }
 
