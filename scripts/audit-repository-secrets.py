@@ -9,6 +9,8 @@ import urllib.request
 
 FIXTURES = {
     "re_only_a_unit_test_value",
+    "re_test_only_not_a_real_key",
+    "re_test_only_deployment",
     "re_only_for_diagnostic_unit_tests",
     "unit-test-value-never-use-in-production-",
 }

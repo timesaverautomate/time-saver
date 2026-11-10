@@ -10,6 +10,7 @@ on:
       - 'src/validation.mjs'
       - 'src/security.mjs'
       - 'config/domain.json'
+      - 'scripts/audit-repository-secrets.py'
       - 'scripts/deploy-site-domain.mjs'
       - 'scripts/run-site-domain.mjs'
 permissions: {}

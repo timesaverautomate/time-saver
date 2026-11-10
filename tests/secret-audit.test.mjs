@@ -16,7 +16,7 @@ test('auditoria aceita configuração sem valores e fixtures de teste conhecidas
   const repo=repository();
   try {
     writeFileSync(path.join(repo.directory,'.env.example'),'RESEND_API_KEY=\nSECURITY_HMAC_KEY=\n');
-    writeFileSync(path.join(repo.directory,'fixture.txt'),'re_only_a_unit_test_value\n');
+    writeFileSync(path.join(repo.directory,'fixture.txt'),'re_only_a_unit_test_value\nre_test_only_not_a_real_key\nre_test_only_deployment\n');
     repo.commit();
     const result=spawnSync('python',[script,'--repository',repo.directory],{encoding:'utf8'});
     assert.equal(result.status,0);assert.equal(JSON.parse(result.stdout).passed,true);
