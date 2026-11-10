@@ -1,4 +1,4 @@
-import os, json, re, unicodedata, requests
+import os, json, re, unicodedata, requests, time
 from google.oauth2 import service_account
 from google.auth.transport.requests import Request
 
@@ -16,14 +16,32 @@ def main():
  names={norm(x[0]) for x in rows[1:] if x}
  emails={norm(x[4]) for x in rows[1:] if len(x)>4}
  new=[]
+ successful_queries=0
+ failed_queries=0
  for city,lat,lon in CITIES:
   if len(new)>=30:break
   q='[out:json][timeout:40];(nwr(around:12000,'+str(lat)+','+str(lon)+')["shop"~"^(computer|electronics|mobile_phone|office_supplies|hardware|pet|furniture)$"]["name"];);out tags 250;'
-  try:
-   r=requests.post("https://overpass.kumi.systems/api/interpreter",data={"data":q},timeout=70);r.raise_for_status()
-   elements=r.json().get("elements",[])
-  except (requests.RequestException,ValueError) as e:
-   print("Consulta indisponível em",city,type(e).__name__);continue
+  elements=None
+  for endpoint in ("https://overpass.private.coffee/api/interpreter","https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter"):
+   try:
+    r=requests.post(endpoint,data={"data":q},headers={"User-Agent":"TimeSaverAutomation/1.0 public-business-research"},timeout=65)
+    if r.status_code!=200:
+     print("Fonte",endpoint,"cidade",city,"HTTP",r.status_code)
+     continue
+    data=r.json()
+    if "elements" not in data:
+     print("Resposta inesperada de",endpoint,"em",city)
+     continue
+    elements=data["elements"]
+    successful_queries+=1
+    break
+   except (requests.RequestException,ValueError) as exc:
+    print("Fonte",endpoint,"cidade",city,"erro",type(exc).__name__)
+  if elements is None:
+   failed_queries+=1
+   print("Todas as fontes indisponíveis em",city)
+   continue
+  time.sleep(1)
   for e in elements:
    t=e.get("tags",{});name=t.get("name","").strip();mail=(t.get("contact:email") or t.get("email") or "").split(";")[0].strip().lower()
    if not name or not re.fullmatch(r"[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}",mail):continue
@@ -34,7 +52,10 @@ def main():
    x[15]="https://www.openstreetmap.org/"+e["type"]+"/"+str(e["id"]);x[16]="OSM público; não verificado";x[23]="Por avaliar";x[24]="Não";x[25]="osm:"+e["type"]+":"+str(e["id"])
    new.append(x);names.add(norm(name));emails.add(norm(mail))
    if len(new)>=30:break
+ print("Consultas com sucesso:",successful_queries,"; falhas:",failed_queries)
  print("Candidatos encontrados:",len(new))
+ if successful_queries==0:
+  raise RuntimeError("Pesquisa falhou em todas as cidades; verificar HTTP e fontes Overpass. Nenhum contacto foi guardado.")
  if os.getenv("DRY_RUN","true")!="false":
   print("SIMULAÇÃO: nenhuma escrita e nenhum envio de email");return
  if new:
