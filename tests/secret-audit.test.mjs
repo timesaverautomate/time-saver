@@ -40,12 +40,12 @@ test('auditoria deteta bloco PEM completo mas ignora texto de instruções',()=>
   const repo=repository();
   try {
     writeFileSync(path.join(repo.directory,'instructions.js'),
-      "const pattern = /-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----/;\\n");
+      "const pattern = /-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----/;\n");
     repo.commit();
     let result=spawnSync('python',[script,'--repository',repo.directory],{encoding:'utf8'});
     assert.equal(result.status,0);
     writeFileSync(path.join(repo.directory,'secret.txt'),
-      '-----BEGIN PRIVATE KEY-----\\n'+'A'.repeat(64)+'\\n-----END PRIVATE KEY-----\\n');
+      '-----BEGIN PRIVATE KEY-----\n'+'A'.repeat(64)+'\n-----END PRIVATE KEY-----\n');
     repo.commit();
     result=spawnSync('python',[script,'--repository',repo.directory],{encoding:'utf8'});
     assert.equal(result.status,1);
