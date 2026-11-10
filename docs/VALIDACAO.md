@@ -1,8 +1,10 @@
 # Verificações realizadas e pendentes
 
-> Atualização de preparação para o domínio timesaverautomate.com: 31 testes locais aprovados, incluindo integração entre frontend/API e auditoria de credenciais históricas. O workflow Pages executa a verificação completa e uma auditoria do histórico remoto antes de permitir publicação. O DNS, o certificado, as regras Cloudflare e o formulário comercial só devem ser marcados como concluídos depois de validação efetiva.
+> Atualização verificada em GitHub Actions: 31 testes aprovados e construção estática concluída. A auditoria do commit 4ff59cec4ad8c2c564a56a92c536c135f42ea112 percorreu 13 commits e 68 blobs de texto sem encontrar os padrões de segredos procurados. É uma pesquisa heurística, não uma garantia absoluta. [Execução e resultados](https://github.com/timesaverautomate/time-saver/actions/runs/42841836621).
 
-> Atualização de 10 de novembro de 2026: o teste técnico real do serviço Resend foi aceite e o titular confirmou a receção na caixa de entrada de timesaverautomate@gmail.com. [Execução verificada](https://github.com/usertechsitee/time-saver/actions/runs/42829562752) e [procedimento](TESTE-EMAIL.md). A chave permanece em GitHub Actions. A submissão através do formulário, a configuração no alojamento, o remetente de produção e os requisitos legais continuam pendentes. O relatório abaixo conserva o alcance das verificações originais.
+> O mesmo workflow confirmou que Pages ainda não está configurado/acessível (HTTP 404); o deploy foi omitido. A última leitura das definições confirma o repositório privado. Não foram alterados DNS nem regras Cloudflare. Certificado, domínio, cabeçalhos e formulário comercial mantêm-se pendentes.
+
+> Atualização de 10 de novembro de 2026: o teste técnico real do serviço Resend foi aceite e o titular confirmou a receção na caixa de entrada de timesaverautomate@gmail.com. [Execução verificada](https://github.com/timesaverautomate/time-saver/actions/runs/42829562752) e [procedimento](TESTE-EMAIL.md). A chave permanece em GitHub Actions. A submissão através do formulário, a configuração no alojamento, o remetente de produção e os requisitos legais continuam pendentes. O relatório abaixo conserva o alcance das verificações originais.
 
 Data: 10 de novembro de 2026. Estes resultados correspondem ao código entregue, não a um serviço de email ou domínio de produção já configurado.
 
@@ -10,7 +12,7 @@ Data: 10 de novembro de 2026. Estes resultados correspondem ao código entregue,
 
 Comando: npm run check, com Node 24.22.1 e SQLite nativo.
 
-**19 testes automáticos aprovados.** O teste de fornecedor usa respostas de teste; não enviou mensagens reais.
+**31 testes automáticos aprovados na versão atual**, incluindo os 19 testes da entrega inicial e verificações adicionais de CORS, exportação Pages e deteção de segredos no histórico. O fornecedor é substituído por respostas de teste nesta suite; o teste técnico real Resend, indicado acima, é uma verificação separada.
 
 | Verificação | Resultado e alcance |
 | --- | --- |
@@ -41,7 +43,7 @@ O PNG de partilha foi gerado a partir do SVG original. A sua apresentação em r
 
 ## Não executado / depende de configuração
 
-- **Submissão e receção efetiva no Gmail:** falta domínio de remetente verificado e credencial de envio.
+- **Submissão através do formulário e receção efetiva no Gmail:** falta backend publicado com D1, remetente de domínio verificado e credencial de envio configurada nesse backend. A chave já está guardada em GitHub Actions e o teste técnico isolado foi recebido; isso não valida o formulário.
 - Verificação real de SPF, DKIM, DMARC, spam, rejeições e devoluções.
 - Limites e idempotência no serviço D1 e Resend reais, incluindo semântica e janela do fornecedor.
 - Verificação do cron, acessos mínimos, MFA, retenção e eliminação nas contas reais.

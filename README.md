@@ -12,7 +12,7 @@ O repositório foi transferido para **timesaverautomate/time-saver**. O domínio
 2. Complete [a revisão de privacidade e operação](docs/PRIVACIDADE-E-OPERACAO.md).
 3. Consulte [as verificações realizadas e pendentes](docs/VALIDACAO.md).
 
-O destinatário indicado é **timesaverautomate@gmail.com**. É configurado exclusivamente no servidor. Falta um domínio de envio verificado e uma chave de serviço de email. Não é pedida a palavra-passe do Gmail.
+O destinatário indicado é **timesaverautomate@gmail.com**. É configurado exclusivamente no servidor. Falta verificar o domínio de envio e configurar no backend a credencial já guardada em GitHub Actions. Não é pedida a palavra-passe do Gmail.
 
 ## O que inclui
 

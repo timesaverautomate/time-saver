@@ -10,6 +10,8 @@ O acesso administrativo à nova conta/repositório GitHub foi confirmado. A inte
 
 As ações oficiais foram fixadas em SHAs completos de releases verificadas. Os checkouts não persistem credenciais. O teste Resend só corre em main. O job de publicação tem apenas as permissões Pages/OIDC necessárias. Pull requests públicos não recebem a chave Resend.
 
+A execução [42841836621](https://github.com/timesaverautomate/time-saver/actions/runs/42841836621) aprovou 31 testes e verificou 13 commits/68 blobs de texto sem encontrar os padrões procurados. Confirmou Pages não configurado/acessível (HTTP 404) e omitiu a publicação. O repositório continuava privado na leitura após o workflow.
+
 O workflow Pages verifica padrões de credenciais no histórico Git completo sem imprimir os valores. A auditoria é heurística; não garante ausência de todos os tipos de segredo. Existem testes que verificam deteção de uma credencial removida do ficheiro atual mas ainda presente no histórico.
 
 ## Código público
