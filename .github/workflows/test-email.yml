@@ -1,0 +1,21 @@
+name: Testar envio de email
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: time-saver-email-diagnostic
+  cancel-in-progress: false
+jobs:
+  test-email:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Enviar teste para o titular da conta Resend
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: node scripts/test-email.mjs
