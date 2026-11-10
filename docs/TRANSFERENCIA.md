@@ -2,7 +2,7 @@
 
 Destino autorizado pelo titular: timesaverautomate/time-saver.
 
-Estado: preparação concluída; a transferência de propriedade ainda tem de ser iniciada e aceite no GitHub. O repositório atual permanece em usertechsitee/time-saver até essa confirmação.
+Estado: transferência confirmada para timesaverautomate/time-saver, com o ID original 1452563434. A nova conta está ligada à integração GitHub desta conversa e o acesso administrativo ao repositório foi verificado. As instruções abaixo ficam como registo do procedimento.
 
 ## Operação de transferência
 

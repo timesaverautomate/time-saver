@@ -1,5 +1,6 @@
 node_modules/
 dist/
+out/
 .env
 .env.*
 !.env.example
@@ -10,3 +11,5 @@ work/
 *.tar.gz
 *.zip
 *.log
+__pycache__/
+*.pyc

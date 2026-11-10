@@ -199,3 +199,51 @@ test('email e conteúdo: limites, UTF-8 e validação de tipos',()=>{
   assert.equal(validateSubmission(null).errors.form,'Pedido inválido.');
   assert.ok(validateSubmission({...quoteData(),description:'a'.repeat(4001)}).errors.description);
 });
+test('backend separado aceita apenas o preflight da origem exata e cabeçalhos previstos',async()=>{
+  const env=testEnv();
+  const request=new Request('https://api.timesaver.test/api/quote',{method:'OPTIONS',headers:{
+    Origin:env.PUBLIC_ORIGIN,'Sec-Fetch-Site':'same-site',
+    'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'content-type,idempotency-key'
+  }});
+  const response=await worker.fetch(request,env);
+  assert.equal(response.status,204);
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'),env.PUBLIC_ORIGIN);
+  assert.equal(response.headers.has('Access-Control-Allow-Credentials'),false);
+  for(const headers of [
+    {Origin:'https://evil.test'},
+    {'Access-Control-Request-Headers':'authorization'},
+    {'Access-Control-Request-Method':'DELETE'}
+  ]) {
+    const changed=new Headers(request.headers);
+    for(const [name,value] of Object.entries(headers))changed.set(name,value);
+    const failed=await worker.fetch(new Request(request.url,{method:'OPTIONS',headers:changed}),env);
+    assert.equal(failed.status,403);
+  }
+});
+test('submissão entre frontend e API preserva validação, idempotência e ausência de cookies',async()=>{
+  const env=testEnv();let calls=0;
+  await withMail(async()=>{calls++;return accepted();},async()=>{
+    const original=await quoteRequest(env);
+    const headers=new Headers(original.headers);
+    headers.set('Sec-Fetch-Site','same-site');
+    const request=new Request('https://api.timesaver.test/api/quote',{method:'POST',headers,body:await original.text()});
+    const first=await worker.fetch(request.clone(),env);
+    const second=await worker.fetch(request.clone(),env);
+    assert.equal(first.status,200);assert.equal((await second.json()).duplicate,true);
+    assert.equal(first.headers.get('Access-Control-Allow-Origin'),env.PUBLIC_ORIGIN);
+    assert.equal(first.headers.has('Set-Cookie'),false);assert.equal(calls,1);
+  });
+});
+test('modo só API não publica a landing page e rejeita origem externa na emissão de tokens',async()=>{
+  const env={...testEnv(),API_ONLY:'true'};
+  assert.equal((await worker.fetch(new Request('https://api.timesaver.test/'),env)).status,404);
+  const denied=await worker.fetch(new Request('https://api.timesaver.test/api/form-status',{headers:{
+    Origin:'https://evil.test','Sec-Fetch-Site':'cross-site','CF-Connecting-IP':'192.0.2.8'
+  }}),env);
+  assert.equal(denied.status,403);assert.equal(denied.headers.has('Access-Control-Allow-Origin'),false);
+  const allowed=await worker.fetch(new Request('https://api.timesaver.test/api/form-status',{headers:{
+    Origin:env.PUBLIC_ORIGIN,'Sec-Fetch-Site':'same-site','CF-Connecting-IP':'192.0.2.8'
+  }}),env);
+  assert.equal(allowed.status,200);assert.equal((await allowed.json()).available,true);
+  assert.equal(allowed.headers.get('Access-Control-Allow-Origin'),env.PUBLIC_ORIGIN);
+});

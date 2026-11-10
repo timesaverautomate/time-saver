@@ -1,0 +1,22 @@
+{
+  "status": "modelo_por_aplicar_e_validar",
+  "hosts": ["timesaverautomate.com", "www.timesaverautomate.com"],
+  "headers": {
+    "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests",
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), browsing-topics=()"
+  },
+  "hsts": {
+    "enableOnlyAfterHTTPSVerified": true,
+    "valueAfterVerification": "max-age=31536000",
+    "includeSubDomains": false,
+    "preload": false
+  },
+  "notes": [
+    "Rever connect-src e form-action quando o backend real for ativado.",
+    "Estes valores precisam de uma regra de resposta Cloudflare num domínio com proxy ativo; um ficheiro no GitHub não altera os cabeçalhos HTTP.",
+    "Confirmar primeiro o certificado GitHub Pages e depois usar Full (strict)."
+  ]
+}

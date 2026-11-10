@@ -23,6 +23,7 @@ test('formulário acessível, sem armazenamento persistente nem submissão mailt
   assert.equal(/localStorage|sessionStorage|indexedDB|document\.cookie|mailto:/.test(js+html),false);
   assert.match(html,/aria-live="polite"/);assert.match(html,/aria-describedby="description-help/);
   assert.match(html,/<button[^>]*type="submit" disabled/);
+  assert.match(html,/<form[^>]*id="quote-form"[^>]*method="post"/);
   assert.match(js,/if \(busy \|\| sent\) return/);
   assert.match(js,/payload\.accepted === true/);
 });

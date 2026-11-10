@@ -5,7 +5,7 @@ Este procedimento utiliza GitHub Actions como ferramenta operacional. Não acres
 ## Guardar a chave
 
 1. Na conta Resend criada com timesaverautomate@gmail.com, abra API Keys e crie uma chave chamada Time Saver, com permissão Sending access.
-2. Abra https://github.com/usertechsitee/time-saver/settings/secrets/actions com a conta GitHub usertechsitee.
+2. Abra https://github.com/timesaverautomate/time-saver/settings/secrets/actions com a conta GitHub timesaverautomate.
 3. Escolha New repository secret.
 4. No campo Name escreva RESEND_API_KEY.
 5. No campo Secret cole a chave real do Resend. Não cole a chave em mensagens, ficheiros, issues, screenshots ou commits.
@@ -27,7 +27,7 @@ O workflow pode ser executado manualmente ou quando há alterações aos ficheir
 
 ## Resultado confirmado — 10 de novembro de 2026
 
-- Execução GitHub Actions: https://github.com/usertechsitee/time-saver/actions/runs/42829562752
+- Execução GitHub Actions: https://github.com/timesaverautomate/time-saver/actions/runs/42829562752
 - Resultado do fornecedor: accepted: true.
 - Referência: time-saver-setup-2026-11-10.
 - Destinatário: timesaverautomate@gmail.com.

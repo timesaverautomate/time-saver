@@ -2,9 +2,11 @@
 
 Website profissional em português de Portugal para apresentar serviços de automação e receber pedidos de orçamento.
 
-**Estado da entrega:** implementação e testes automáticos concluídos; envio real e publicação comercial pendentes das configurações descritas abaixo. Nenhuma compra foi efetuada. Não são necessários ficheiros no seu PC para manter ou publicar este projeto.
+**Estado da entrega:** código e testes automáticos preparados; teste operacional Resend recebido e confirmado. O formulário comercial e a publicação final continuam dependentes das configurações e dados legais descritos abaixo. Nenhuma compra foi efetuada. Não são necessários ficheiros no seu PC para manter ou publicar este projeto.
 
 ## Começar aqui
+
+O repositório foi transferido para **timesaverautomate/time-saver**. O domínio indicado é **timesaverautomate.com**, com DNS na Cloudflare. Consulte [o guia de GitHub Pages](docs/GITHUB-PAGES.md) e [a preparação do domínio e segurança](docs/DOMINIO-E-SEGURANCA.md).
 
 1. Leia [o guia de entrega e ativação](docs/ENTREGA.md): explica os passos pelo navegador, sem terminal no PC.
 2. Complete [a revisão de privacidade e operação](docs/PRIVACIDADE-E-OPERACAO.md).
@@ -54,8 +56,16 @@ A construção junta os módulos e os recursos de public/ em dist/server/index.j
 
 Para desenvolvimento num ambiente na nuvem, é possível usar Wrangler com um ambiente de teste e D1 local. Consulte primeiro as condições da ferramenta e da plataforma. Nunca coloque segredos no código ou no navegador.
 
-## Alojamento
+## Alojamento escolhido: GitHub Pages
 
-**GitHub guarda o código. Cloudflare Workers executa o site e o backend.** GitHub Pages, sozinho, não executa o processamento do formulário. A implementação não depende de funcionalidades de autenticação do alojamento.
+O frontend está preparado para GitHub Pages, com recursos locais e caminhos adaptados ao projeto ou ao domínio personalizado. O domínio pretendido é https://timesaverautomate.com. Não deve ser considerado publicado antes do deploy e da verificação HTTP.
 
-A configuração .openai/hosting.json identifica uma cópia de revisão no Sites, com armazenamento e integrações desativados. Não altera a propriedade do repositório GitHub. A publicação comercial não foi ativada. Para a instalação pública completa, siga o guia Cloudflare.
+    npm run build:pages
+
+O workflow de Pages constrói uma revisão, audita padrões de segredos no histórico e verifica a configuração de alojamento. A publicação comercial permanece bloqueada pelos marcadores legais. O titular autorizou a visibilidade pública; essa autorização não altera automaticamente as definições do repositório.
+
+O backend é separado, porque GitHub Pages não executa funções de servidor. O Worker suporta API dedicada, CORS para a origem exata, validação, limites partilhados e proteção contra duplicados. Na exportação estática, o formulário permanece desativado até configurar um endpoint HTTPS real em QUOTE_API_ORIGIN e o backend confirmar disponibilidade. A chave Resend fica no servidor.
+
+As ações oficiais estão fixadas em SHAs completos. A configuração de cabeçalhos e TLS Cloudflare está documentada e preparada como modelo, sem afirmar que já foi aplicada. O repositório público não contém os valores dos segredos de Actions.
+
+A versão privada antiga no Sites mantém-se como referência de revisão enquanto o alojamento de destino está por concluir.

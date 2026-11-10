@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.generated.mjs';
 import { validateSubmission, readBoundedJSON } from './validation.mjs';
-import { securityHeaders, apiJSON, originAllowed, keyedHash, issueFormToken, validFormToken } from './security.mjs';
+import { securityHeaders, apiJSON, originAllowed, keyedHash, issueFormToken, validFormToken, corsResponse, corsPreflight } from './security.mjs';
 import { cleanupSecurity, takeRate, claimSubmission, markSubmission } from './store.mjs';
 import { deliveryConfigured, sendQuote } from './mail.mjs';
 
@@ -27,6 +27,10 @@ const pendingText = 'O formulário ainda não está disponível. O envio de pedi
 async function handleAPI(request, env) {
   const path = new URL(request.url).pathname;
   if (path === '/api/form-status' && request.method === 'GET') {
+    if ((request.headers.has('Origin') && !originAllowed(request,env))
+      || (!request.headers.has('Origin') && new URL(request.url).origin !== env.PUBLIC_ORIGIN)) {
+      return apiJSON({available:false,message:'Origem não permitida.'},403,env);
+    }
     if (!deliveryConfigured(env)) return apiJSON({ available:false, message:pendingText },200,env);
     try {
       if (!await applyLimits(request,env,'token')) return apiJSON({ available:false, message:'Foram feitas demasiadas tentativas. Aguarde um minuto.' },429,env,{'Retry-After':'60'});
@@ -76,7 +80,11 @@ async function handleAPI(request, env) {
 async function workerFetch(request, env = {}) {
   try {
     const url = new URL(request.url);
-    if (url.pathname.startsWith('/api/')) return await handleAPI(request,env);
+    if (url.pathname.startsWith('/api/')) {
+      if (request.method === 'OPTIONS') return corsPreflight(request,env);
+      return corsResponse(request,await handleAPI(request,env),env);
+    }
+    if (env.API_ONLY === 'true') return apiJSON({message:'Página não encontrada.'},404,env);
     if (!['GET','HEAD'].includes(request.method)) return new Response('Método não permitido.',{status:405,headers:securityHeaders(env)});
     if (url.pathname === '/robots.txt') {
       return new Response(`User-agent: *\n${env.LEGAL_READY === 'true' ? 'Allow: /' : 'Disallow: /'}\n`,{headers:{...Object.fromEntries(securityHeaders(env)),'Content-Type':'text/plain; charset=utf-8'}});

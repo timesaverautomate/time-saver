@@ -6,6 +6,7 @@
   "engines": { "node": ">=22.13" },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:pages": "node scripts/build-github-pages.mjs",
     "test": "node scripts/build.mjs && node --experimental-sqlite --test tests/*.test.mjs",
     "preflight": "node scripts/preflight.mjs",
     "check": "node --check src/worker.mjs && node --check public/app.js && npm test && npm run build",

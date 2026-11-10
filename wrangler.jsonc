@@ -8,7 +8,8 @@
   "vars": {
     "MAIL_ENABLED": "false",
     "LEGAL_READY": "false",
-    "PUBLIC_ORIGIN": "https://www.exemplo.pt",
+    "PUBLIC_ORIGIN": "https://timesaverautomate.com",
+    "API_ONLY": "true",
     "HSTS_ENABLED": "false"
   },
   "d1_databases": [{

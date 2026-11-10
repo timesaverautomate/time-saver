@@ -57,6 +57,16 @@ flowButtons.forEach((button,index)=>{
 
 const form = document.querySelector('#quote-form');
 if (form) {
+  const configuredAPI = document.querySelector('meta[name="time-saver-api-origin"]')?.content || '';
+  let apiBase = '', invalidAPI = false;
+  if (configuredAPI) {
+    try {
+      const parsed = new URL(configuredAPI);
+      if (parsed.origin !== configuredAPI || parsed.protocol !== 'https:') invalidAPI = true;
+      else apiBase = parsed.origin;
+    } catch { invalidAPI = true; }
+  }
+  const formDisabledByHosting = invalidAPI || document.querySelector('meta[name="time-saver-form-mode"]')?.content === 'disabled';
   const submit = form.querySelector('[type=submit]');
   const submitLabel = submit.querySelector('span');
   const availability = document.querySelector('#form-availability');
@@ -112,8 +122,13 @@ if (form) {
   async function refreshToken() {
     available = false; submit.disabled = true;
     clearTimeout(tokenReadyTimer);
+    if (formDisabledByHosting) {
+      availability.hidden = false;
+      availability.textContent = 'O formulário ainda não está disponível. O envio de pedidos está temporariamente desativado.';
+      return;
+    }
     try {
-      const response = await fetch('/api/form-status',{cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(12_000)});
+      const response = await fetch(apiBase+'/api/form-status',{cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(12_000)});
       const status = await response.json();
       if (!response.ok || !status.available || typeof status.token !== 'string') throw new Error(status.message || 'O formulário está temporariamente indisponível.');
       token = status.token;
@@ -157,7 +172,7 @@ if (form) {
     form.setAttribute('aria-busy','true'); submitLabel.textContent = 'A enviar o pedido…';
     result.replaceChildren();
     try {
-      const response = await fetch('/api/quote',{
+      const response = await fetch(apiBase+'/api/quote',{
         method:'POST', credentials:'omit', cache:'no-store',
         headers:{'Content-Type':'application/json','Idempotency-Key':submissionKey},
         body:JSON.stringify({...data,token}),signal:AbortSignal.timeout(20_000)
