@@ -40,28 +40,30 @@ No domínio real: email inválido e destinatário adicional rejeitados com 422; 
 
 Depois das alterações, novo pedido sintético pela interface recebeu a referência `TS-ED32CC1319B71F80614E` e foi encontrado na caixa INBOX de `timesaverautomate@gmail.com`. A repetição devolveu a mesma referência e a pesquisa encontrou uma única mensagem. A interface pública passou em Chromium a 375 e 1440 px, sem erros JavaScript, recursos falhados ou pedidos de recursos externos.
 
-A revisão final está no commit `bcedec73f2fb563b1fe547426f3190e2c59dcf4a`. O workflow [42864927352](https://github.com/timesaverautomate/time-saver/actions/runs/42864927352) confirmou domínio/API e executou a verificação independente de handshake diretamente no GitHub Actions. **74 testes passaram**; a auditoria do histórico examinou 36 commits e 207 blobs sem os padrões procurados. O teste de transporte mantém estado de falha intencionalmente enquanto a pendência abaixo existir; o sucesso do deploy não é apresentado como aprovação integral do TLS.
+A revisão final está no commit `bcedec73f2fb563b1fe547426f3190e2c59dcf4a`. O workflow [42864927352](https://github.com/timesaverautomate/time-saver/actions/runs/42864927352) confirmou domínio/API e executou a verificação independente de handshake diretamente no GitHub Actions. **74 testes passaram**; a auditoria do histórico examinou 36 commits e 207 blobs sem os padrões procurados. Na primeira execução, o teste de transporte detetou protocolos antigos e assinalou falha; a reexecução após a alteração do titular passou, conforme indicado abaixo.
 
-## Pendência confirmada: protocolos TLS antigos na Cloudflare
+## TLS mínimo confirmado — pendência resolvida
 
-O teste real negociou TLS 1.0, 1.1, 1.2 e 1.3, com certificado e hostname validados. Portanto, as versões modernas funcionam, mas **as versões 1.0 e 1.1 ainda são aceites no handshake**. O Worker recusa os pedidos dessas versões com HTTP 426, mas isso não desativa o protocolo na ligação inicial.
+Após o titular alterar a versão mínima na Cloudflare, a [reexecução do workflow, job 130005009105](https://github.com/timesaverautomate/time-saver/actions/runs/42864927352/job/130005009105), terminou com sucesso em 10/11/2026 às 17:33 UTC:
 
-A consulta da definição mínima da zona recebeu **HTTP 403** com a credencial disponível. Nenhuma alteração dessa opção foi declarada como concluída. A seleção das credenciais de zona já disponíveis não permitiu ultrapassar a limitação; não foram recolhidas novas credenciais nem alargadas permissões automaticamente.
+| Versão | Resultado real da ligação |
+| --- | --- |
+| TLS 1.0 | Recusado pelo servidor com alerta de versão do protocolo |
+| TLS 1.1 | Recusado pelo servidor com alerta de versão do protocolo |
+| TLS 1.2 | Negociado com certificado e hostname validados |
+| TLS 1.3 | Negociado com certificado e hostname validados |
 
-Para concluir pelo navegador, sem custos:
+Não houve resultados inconclusivos. O estado `time-saver/transport-tls` passou para **success**. Os 74 testes, a auditoria de padrões e as verificações do domínio/API também passaram nesta reexecução.
 
-1. Abrir Cloudflare e selecionar `timesaverautomate.com`.
-2. Abrir **SSL/TLS → Edge Certificates → Minimum TLS Version** (Certificados de borda → Versão mínima de TLS).
-3. Selecionar **TLS 1.2** e guardar. Não selecionar apenas TLS 1.3, para manter compatibilidade com navegadores que suportam 1.2.
-4. Reexecutar o job `configure` do workflow de domínio. O teste `time-saver/transport-tls` só passa quando TLS 1.0/1.1 forem recusados e TLS 1.2/1.3 continuarem disponíveis.
+A verificação HTTP independente confirmou homepage 200, formulário presente e ativo, API com `available: true` e `no-store`, CSP/Trusted Types, DENY, nosniff, HSTS de um ano, ausência de Set-Cookie nas respostas observadas e redirecionamentos HTTP/www 308 para HTTPS canónico. Não foi enviada nova submissão de orçamento nesta verificação.
 
-Alternativa para permitir manutenção automática: guardar em GitHub Actions Secrets uma credencial `CLOUDFLARE_ZONE_API_TOKEN` com permissão de leitura/edição de **Zone Settings**, limitada a este domínio. Nunca enviar o valor por chat ou colocá-lo no código. O instalador só tenta elevar versões antigas a 1.2 e não reduz uma configuração 1.3 existente.
+A consulta da definição da zona pela API continua limitada pela credencial disponível (403). O teste direto de handshake confirmou o comportamento efetivo após a configuração manual. Para manutenção futura, a opção está em **Cloudflare → timesaverautomate.com → SSL/TLS → Edge Certificates → Minimum TLS Version**. Uma credencial de zona, se necessária para automatizar alterações futuras, deve ter leitura/edição de Zone Settings limitada a este domínio e ser guardada apenas em Actions Secrets como `CLOUDFLARE_ZONE_API_TOKEN`.
 
 Os testes anteriores de entrega real e SPF/DKIM/DMARC estão também em [VALIDACAO.md](VALIDACAO.md).
 
 ## Operação e limites da verificação
 
-O instalador tenta consultar o TLS mínimo da zona e subir versões 1.0/1.1 para 1.2, preservando uma configuração 1.3 existente. Só declara o valor confirmado após leitura. Se a credencial não permitir consultar ou alterar essa opção, regista essa pendência; o bloqueio HTTP a TLS antigo não é confundido com recusa do handshake.
+O instalador tenta consultar o TLS mínimo da zona e subir versões 1.0/1.1 para 1.2, preservando uma configuração 1.3 existente. Só declara o valor confirmado após leitura. Se a credencial não permitir consultar ou alterar essa opção, regista a limitação de acesso e verifica o comportamento através do teste independente de handshake. O bloqueio HTTP a TLS antigo não é confundido com recusa da ligação inicial.
 
 A configuração e manutenção de MFA/passkeys, acessos à caixa Gmail e contas de gestão, restrição dos tokens e regras de proteção do repositório não podem ser confirmadas apenas pelo código. Confirmar em cada conta e rever periodicamente acessos. Em GitHub Settings → Branches/Rulesets, avaliar proteção de main e impedir force push; em Settings → Code security, confirmar as proteções disponíveis no plano. Não bloquear a manutenção com regras que o titular não consiga cumprir.
 

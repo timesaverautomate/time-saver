@@ -2,7 +2,9 @@
 
 Data: 10/11/2026. Arquitetura ativa: GitHub Pages + Worker Cloudflare `time-saver-edge` + Resend + Gmail, sem base de dados de pedidos. Os resultados de versões anteriores com D1 estão no histórico Git e não descrevem o fluxo atual.
 
-## Executado antes da publicação
+**Atualização de segurança, 10/11/2026 às 17:33 UTC:** 74 testes aprovados; TLS 1.0/1.1 recusados e TLS 1.2/1.3 confirmados com certificado válido após alteração na Cloudflare. Domínio e API disponíveis. [Relatório e evidência da reexecução](SEGURANCA.md).
+
+## Verificação inicial do formulário, antes da publicação
 
 - `npm run check`: **58 testes aprovados**. Incluem formato e limites no servidor, listas de triagem, origem, tickets, honeypot, corpo excessivo, rate limit, fornecedor com falha/redirecionamento/sem ID e resposta pública sem detalhes internos.
 - Idempotência: mesma tentativa produz referência, data, corpo e chave de fornecedor iguais. A supressão efetiva de duplicados no Resend depende da verificação real indicada abaixo.
