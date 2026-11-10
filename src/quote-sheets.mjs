@@ -81,6 +81,12 @@ async function rows(access,fetcher){
   if(all.length>=10000)throw Error('sheets_read_limit');
   return all;
 }
+export async function verifyQuoteSheet(env,{fetcher=fetch,authorize=googleToken}={}){
+  const access=await authorize(env,fetcher);
+  const all=await rows(access,fetcher);
+  return {ready:true,existingRows:all.length-1};
+}
+
 export async function storeQuote(env,data,reference,received,{
   fetcher=fetch,authorize=googleToken
 }={}){
