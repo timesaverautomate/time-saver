@@ -1,0 +1,31 @@
+name: TimeSaver - pesquisar contactos B2B
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Simular sem escrever no CRM?
+        required: true
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+        default: 'true'
+  schedule:
+    - cron: '15 8 * * 1-5'
+permissions:
+  contents: read
+jobs:
+  pesquisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install google-auth requests
+      - name: Pesquisa CRM sem envios
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          DRY_RUN: ${{ github.event_name == 'schedule' && 'true' || inputs.dry_run || 'true' }}
+        run: python scripts/prospect_crm.py
