@@ -31,9 +31,9 @@ Com Node 24:
 
 A pasta out/ contém HTML, CSS, JavaScript, SVG e PNG locais, com caminhos adaptados a /time-saver/. As páginas legais têm diretórios próprios. São gerados favicon, imagem de partilha absoluta, URLs canónicos, política de referência e CSP por meta. Não são copiados segredos, código do Worker ou documentos internos.
 
-O workflow github-pages.yml constrói um artefacto de revisão e verifica a configuração Pages. Só tenta publicar quando Pages está configurado e o preflight das páginas legais passa. Os marcadores atuais continuam a bloquear a publicação comercial, conforme a instrução original.
+O workflow github-pages.yml constrói um artefacto de revisão e verifica a configuração Pages. A produção só é publicada quando Pages está configurado e o preflight das páginas legais passa. O pedido posterior para colocar o site no ar é concretizado por um modo explícito de pré-lançamento: conserva a apresentação visual, remove todos os campos de recolha e substitui as minutas incompletas por informação sobre esta versão. Não ativa a recolha comercial nem publica dados legais inventados. Os marcadores das minutas continuam a bloquear o modo production.
 
-A revisão fica sem indexação. Uma publicação que passa pelo preflight é construída com indexação preparada. O preflight é uma verificação de marcadores conhecidos e não comprova conformidade legal.
+O pré-lançamento público e a revisão ficam sem indexação. O modo preview é autorizado em config/domain.json e é selecionado por defeito; production exige a verificação legal. O formulário da versão completa permanece implementado no código, mas não integra o HTML público do pré-lançamento. Uma publicação que passa pelo preflight é construída com indexação preparada. O preflight é uma verificação de marcadores conhecidos e não comprova conformidade legal.
 
 ## Email e backend
 

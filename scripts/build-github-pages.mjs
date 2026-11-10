@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir, readdir, rm, copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { previewHTML } from './preview-html.mjs';
 
 const root = path.resolve(import.meta.dirname,'..');
 const legalRoutes = new Set(['privacidade','aviso-legal','cookies']);
@@ -12,8 +13,10 @@ export async function buildGitHubPages({
   basePath = '/time-saver/',
   origin = 'https://timesaverautomate.github.io',
   indexable = false,
-  apiOrigin = ''
+  apiOrigin = '',
+  publicPreview = false
 } = {}) {
+  if (publicPreview) { indexable=false; apiOrigin=''; }
   if (!/^\/(?:[A-Za-z0-9._-]+\/)*$/.test(basePath) || basePath.split('/').some(part=>part === '.' || part === '..')) throw new Error('Caminho base inválido.');
   const siteOrigin = new URL(origin);
   if (siteOrigin.origin !== origin || siteOrigin.protocol !== 'https:') throw new Error('Origem HTTPS inválida.');
@@ -37,6 +40,7 @@ export async function buildGitHubPages({
     }
     let html = await readFile(path.join(sourcePath,file.name),'utf8');
     const name = file.name.slice(0,-5);
+    if (publicPreview) html=previewHTML(name,html);
     const route = name === 'index' ? '' : legalRoutes.has(name) ? name+'/' : file.name;
     const canonical = origin+basePath+route;
     html = html.replace(/\b(href|src)="\/(?!\/)([^"]*)"/g,(_match,attribute,target)=>{
@@ -59,6 +63,7 @@ export async function buildGitHubPages({
     html = html.replace(/(<meta charset="utf-8">)/,'$1\n'+metadata);
     html = html.replace('A verificar a disponibilidade do formulário…','O formulário ainda não está disponível. O envio de pedidos está temporariamente desativado.');
     html = html.replace('Ative o JavaScript para validar e enviar este formulário. Os seus dados não foram enviados.','O envio de pedidos está temporariamente desativado.');
+    if (publicPreview && /\[[A-ZÁÀÃÂÉÊÍÓÔÕÚÇ][^\]]+\]|<form\b/.test(html)) throw new Error('Pré-lançamento contém marcadores ou formulário.');
     const destination = legalRoutes.has(name) ? path.join(outputPath,name,'index.html') : path.join(outputPath,file.name);
     await mkdir(path.dirname(destination),{recursive:true});
     await writeFile(destination,html);
@@ -66,7 +71,7 @@ export async function buildGitHubPages({
   }
   await writeFile(path.join(outputPath,'.nojekyll'),'');
   await writeFile(path.join(outputPath,'robots.txt'),'User-agent: *\n'+(indexable ? 'Allow: '+basePath : 'Disallow: /')+'\n');
-  return {directory:outputPath,expectedURL:origin+basePath,resources:count,indexable,backendConfigured:Boolean(apiOrigin),formAvailability:'Confirmada apenas pelo backend, nunca pela construção estática.'};
+  return {directory:outputPath,expectedURL:origin+basePath,resources:count,indexable,backendConfigured:Boolean(apiOrigin),publicPreview,formAvailability:publicPreview ? 'Sem formulário nesta versão de pré-lançamento.' : 'Confirmada apenas pelo backend, nunca pela construção estática.'};
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -77,7 +82,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     basePath,
     origin:process.env.PAGES_ORIGIN || 'https://timesaverautomate.github.io',
     indexable:process.env.PAGES_INDEXABLE === 'true',
-    apiOrigin:process.env.PAGES_QUOTE_API_ORIGIN || ''
+    apiOrigin:process.env.PAGES_QUOTE_API_ORIGIN || '',
+    publicPreview:process.env.PAGES_PUBLIC_PREVIEW === 'true'
   });
   console.log(JSON.stringify(result,null,2));
 }

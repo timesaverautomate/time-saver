@@ -1,6 +1,12 @@
 name: Preparar e publicar no GitHub Pages
 on:
   workflow_dispatch:
+    inputs:
+      publication:
+        description: Modo de publicação
+        type: choice
+        default: preview
+        options: [preview, production]
   push:
     branches: [main]
 permissions: {}
@@ -73,8 +79,11 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
-      - name: Verificar dados legais antes de publicar
-        run: npm run preflight
+      - name: Validar modo de publicação e condições aplicáveis
+        id: publication
+        env:
+          REQUESTED_PUBLICATION: ${{ inputs.publication }}
+        run: node scripts/prepare-publication.mjs
       - name: Obter configuração Pages
         id: pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
@@ -82,7 +91,8 @@ jobs:
         env:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           PAGES_ORIGIN: ${{ steps.pages.outputs.origin }}
-          PAGES_INDEXABLE: 'true'
+          PAGES_INDEXABLE: ${{ steps.publication.outputs.indexable }}
+          PAGES_PUBLIC_PREVIEW: ${{ steps.publication.outputs.preview }}
           PAGES_QUOTE_API_ORIGIN: ${{ vars.QUOTE_API_ORIGIN }}
         run: npm run build:pages
       - name: Preparar ficheiros de publicação

@@ -1,5 +1,9 @@
 # Verificações realizadas e pendentes
 
+> QA do pré-lançamento executada em Chromium headless com Playwright: larguras 320, 375, 768 e 1440 px, sem deslocação horizontal. Verificados salto por teclado, menu móvel, mudança da demonstração, abertura de FAQ por teclado, ausência de campos de recolha, três rotas informativas com HTTP 200 e ausência de erros JavaScript. Capturas desktop/telemóvel inspecionadas. Este resultado refere-se à exportação local de pré-lançamento; não verifica o formulário comercial, leitores de ecrã ou uma certificação WCAG.
+
+> Pré-lançamento público: 39 testes locais aprovados. As verificações adicionais confirmam que o modo preview não exporta formulários ou marcadores legais, força ausência de API/indexação e mantém as minutas de origem inalteradas. O modo production continua bloqueado. A publicação e os pedidos HTTP ao endereço público só serão considerados verificados depois de executar o deploy. A credencial Cloudflare foi detetada na nova tentativa, mas o fornecedor recusou uma operação; o instalador passa a registar apenas a categoria da operação e o código HTTP, sem valores ou respostas internas.
+
 > Preparação adicional: 37 testes locais aprovados, incluindo seis testes do instalador Cloudflare. Verificam bloqueio antes de chamadas externas sem credenciais, destino main/repositório, preservação de HMAC, recusa de Worker alheio ou ativo, jurisdição da base, CORS restrito e ausência de valores secretos nos resultados. O Wrangler 4.160.0 também compilou o Worker em modo dry-run, sem publicar ou criar recursos. A instalação real continua dependente de acesso Cloudflare e do resultado do novo workflow; não confundir os testes com esse acesso.
 
 > Atualização verificada em GitHub Actions: 31 testes aprovados e construção estática concluída. A auditoria do commit 4ff59cec4ad8c2c564a56a92c536c135f42ea112 percorreu 13 commits e 68 blobs de texto sem encontrar os padrões de segredos procurados. É uma pesquisa heurística, não uma garantia absoluta. [Execução e resultados](https://github.com/timesaverautomate/time-saver/actions/runs/42841836621).
@@ -53,10 +57,10 @@ O PNG de partilha foi gerado a partir do SVG original. A sua apresentação em r
 - Contratos, dados legais, RAL, Livro de Reclamações, retenção aprovada e transferências internacionais.
 - Cookies efetivos introduzidos pelo alojamento e por mecanismos do edge.
 - Indexação, URL canónico e imagem Open Graph absoluta após definir o domínio.
-- **Revisão visual e interação em navegador:** não foi disponibilizada a ferramenta de controlo do navegador neste ambiente. Não foi instalada uma alternativa para contornar essa limitação.
+- **Revisão do formulário comercial em navegador:** permanece pendente. A apresentação pública de pré-lançamento foi agora verificada em Chromium/Playwright, conforme descrito acima; não inclui formulário.
 - Navegação por teclado completa, leitores de ecrã, contraste medido e auditoria WCAG 2.2 AA. Acessibilidade é um objetivo técnico, não uma certificação obtida.
 
-Contexto da limitação de navegador: ambiente ccarenv_b64_Y2NhcmVudl81YzhhZWVkZjA4MDQ4MTkxYTMyYjJlNmMwNzE3MjNmMQ, ligado e pronto para comandos; desktop anunciado como enabled com estado unknown, mas sem ferramenta cua_repl.js oferecida à sessão.
+Na entrega inicial da versão Sites não estava disponível a ferramenta de desktop desse fluxo. Na publicação atual em GitHub Pages, a validação automatizada da exportação foi executada com o Chromium e o Playwright disponíveis no ambiente de desenvolvimento.
 
 ## Guião de validação manual
 

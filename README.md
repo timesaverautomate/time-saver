@@ -2,7 +2,7 @@
 
 Website profissional em português de Portugal para apresentar serviços de automação e receber pedidos de orçamento.
 
-**Estado da entrega:** código e testes automáticos preparados; teste operacional Resend recebido e confirmado. O formulário comercial e a publicação final continuam dependentes das configurações e dados legais descritos abaixo. Nenhuma compra foi efetuada. Não são necessários ficheiros no seu PC para manter ou publicar este projeto.
+**Estado da entrega:** pré-lançamento público solicitado, preparado sem formulário e sem recolha de pedidos. Código e testes automáticos preparados; teste operacional Resend recebido e confirmado. O formulário comercial e a publicação final continuam dependentes das configurações e dados legais descritos abaixo. Nenhuma compra foi efetuada. Não são necessários ficheiros no seu PC para manter ou publicar este projeto.
 
 ## Começar aqui
 
@@ -63,7 +63,7 @@ O frontend está preparado para GitHub Pages, com recursos locais e caminhos ada
 
     npm run build:pages
 
-O workflow de Pages constrói uma revisão, audita padrões de segredos no histórico e verifica a configuração de alojamento. A publicação comercial permanece bloqueada pelos marcadores legais. O titular tornou o repositório público e ativou Pages com origem GitHub Actions, confirmado pela API. Falta a primeira publicação: o endereço do site ainda devolve 404 e o bloqueio de dados legais permanece ativo.
+O workflow de Pages constrói uma revisão, audita padrões de segredos no histórico e verifica a configuração de alojamento. A publicação comercial permanece bloqueada pelos marcadores legais. O modo explícito preview publica uma apresentação de pré-lançamento sem campos de recolha, sem os documentos legais incompletos e sem indexação; as minutas completas permanecem no código para revisão. O titular tornou o repositório público e ativou Pages com origem GitHub Actions, confirmado pela API. Falta a primeira publicação: o endereço do site ainda devolve 404 e o bloqueio de dados legais permanece ativo.
 
 O backend é separado, porque GitHub Pages não executa funções de servidor. O Worker suporta API dedicada, CORS para a origem exata, validação, limites partilhados e proteção contra duplicados. Na exportação estática, o formulário permanece desativado até configurar um endpoint HTTPS real em QUOTE_API_ORIGIN e o backend confirmar disponibilidade. A chave Resend fica no servidor.
 

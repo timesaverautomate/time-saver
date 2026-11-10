@@ -17,6 +17,7 @@ function fixture({ existing = null, secrets = [], databases = [], accounts = [{i
   const fetcher = async (url, options = {}) => {
     calls.push({url,options});
     const path = new URL(url).pathname;
+    if (path==='/client/v4/zones') return json([]);
     if (new URL(url).hostname !== 'api.cloudflare.com') {
       const origin = options.headers.Origin;
       if (origin !== FRONTEND_ORIGIN) return Response.json({available:false},{status:403,

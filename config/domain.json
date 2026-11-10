@@ -15,5 +15,7 @@
   "githubPagesBuildType": "workflow",
   "privacyEmail": "timesaverautomate@gmail.com",
   "lastVerifiedDate": "2026-11-10",
-  "githubPagesDeploymentVerified": false
+  "githubPagesDeploymentVerified": false,
+  "publicationMode": "preview",
+  "publicPreviewAuthorised": true
 }

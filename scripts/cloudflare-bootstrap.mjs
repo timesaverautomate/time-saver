@@ -9,7 +9,7 @@ const ACCOUNT_ID = /^[a-f0-9]{32}$/i;
 const repositoryId = '1452563434';
 
 class SetupError extends Error {
-  constructor(code) { super(code); this.code = code; }
+  constructor(code, httpStatus, operation) { super(code); this.code = code; this.httpStatus=httpStatus; this.operation=operation; }
 }
 function requireSetup(condition, code) {
   if (!condition) throw new SetupError(code);
@@ -32,6 +32,12 @@ export async function bootstrapCloudflare({ env, fetcher = fetch, command, saveC
     requireSetup(typeof command === 'function' && typeof saveConfig === 'function', 'missing_installer');
 
     async function cloudflare(endpoint, { method = 'GET', body, allowNotFound = false } = {}) {
+      const operation=endpoint.startsWith('/zones?') ? 'zone_account_discovery'
+        : endpoint.startsWith('/accounts?') ? 'account_discovery'
+        : endpoint.endsWith('/workers/subdomain') ? 'workers_subdomain'
+        : endpoint.endsWith('/settings') ? 'worker_settings'
+        : endpoint.endsWith('/secrets') ? 'worker_secret_metadata'
+        : endpoint.includes('/d1/database') ? 'd1_database' : 'cloudflare_request';
       let response;
       try {
         response = await fetcher('https://api.cloudflare.com/client/v4' + endpoint, {
@@ -41,7 +47,7 @@ export async function bootstrapCloudflare({ env, fetcher = fetch, command, saveC
         });
       } catch { throw new SetupError('cloudflare_unreachable'); }
       if (allowNotFound && response.status === 404) return null;
-      requireSetup(response.ok, 'cloudflare_access_or_request_failed');
+      if (!response.ok) throw new SetupError('cloudflare_access_or_request_failed',response.status,operation);
       let data;
       try { data = await response.json(); } catch { throw new SetupError('cloudflare_invalid_response'); }
       requireSetup(data.success === true && data.result !== undefined, 'cloudflare_invalid_response');
@@ -50,9 +56,15 @@ export async function bootstrapCloudflare({ env, fetcher = fetch, command, saveC
 
     let accountId = env.CLOUDFLARE_ACCOUNT_ID || '';
     if (!accountId) {
-      const accounts = await cloudflare('/accounts?per_page=50');
-      requireSetup(Array.isArray(accounts) && accounts.length === 1, 'account_selection_required');
-      accountId = accounts[0].id;
+      // Se o token permitir ler a zona conhecida, identificar a conta sem exigir seleção manual.
+      const zones=await cloudflare('/zones?name=timesaverautomate.com&per_page=50').catch(()=>null);
+      const matches=Array.isArray(zones) ? zones.filter(zone=>zone.name==='timesaverautomate.com') : [];
+      if (matches.length===1 && ACCOUNT_ID.test(matches[0].account?.id || '')) accountId=matches[0].account.id;
+      else {
+        const accounts = await cloudflare('/accounts?per_page=50');
+        requireSetup(Array.isArray(accounts) && accounts.length === 1, 'account_selection_required');
+        accountId = accounts[0].id;
+      }
     }
     requireSetup(ACCOUNT_ID.test(accountId), 'invalid_account_id');
     const base = '/accounts/' + accountId;
@@ -137,6 +149,8 @@ export async function bootstrapCloudflare({ env, fetcher = fetch, command, saveC
   } catch (error) {
     // Nunca copiar mensagens do fornecedor, saídas do CLI ou valores de configuração para logs.
     return { installed:false, operational:false, backendOrigin,
-      code:error instanceof SetupError ? error.code : 'installation_or_verification_failed' };
+      code:error instanceof SetupError ? error.code : 'installation_or_verification_failed',
+      ...(error instanceof SetupError && Number.isInteger(error.httpStatus)
+        ? {httpStatus:error.httpStatus,operation:error.operation} : {}) };
   }
 }

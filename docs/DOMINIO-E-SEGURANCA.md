@@ -32,7 +32,7 @@ Rever a proteção de segredos e push protection disponibilizadas pelo GitHub e 
 6. Confirmar o certificado GitHub Pages e ativar Enforce HTTPS.
 7. Só depois de confirmar o certificado de origem, configurar o proxy Cloudflare, Full (strict), encaminhamento HTTPS e cabeçalhos.
 
-O preflight mantém a publicação comercial bloqueada enquanto faltarem os dados legais. Uma revisão técnica não substitui a aprovação factual da informação.
+O preflight mantém a publicação comercial bloqueada enquanto faltarem os dados legais. O pedido posterior de publicação imediata é tratado como pré-lançamento explícito: sem formulário, sem minutas incompletas publicadas e sem indexação. As minutas comerciais não são apagadas nem se preenchem com dados inventados. Uma revisão técnica não substitui a aprovação factual da informação.
 
 ## DNS do site
 
