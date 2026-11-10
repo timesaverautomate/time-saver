@@ -5,6 +5,8 @@ import os
 import re
 import time
 import unicodedata
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from urllib.parse import urlsplit
 
 import requests
@@ -41,6 +43,9 @@ GENERIC_LOCAL_PARTS = {
 }
 EMAIL_RE = re.compile(r"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$", re.I)
 MAX_TEST_WRITES = 2
+MAX_DAILY_WRITES = 30
+AUTO_MARKER = 'TSCRM_AUTO_DATE='
+FREE_EMAIL_DOMAINS = {'gmail.com', 'hotmail.com', 'outlook.com', 'live.com', 'yahoo.com', 'icloud.com', 'proton.me'}
 
 
 def norm(value):
@@ -60,7 +65,8 @@ def candidate(element, city):
     name = str(tags.get("name") or "").strip()
     email = str(tags.get("contact:email") or tags.get("email") or "").split(";")[0].strip().lower()
     if (not name or not EMAIL_RE.fullmatch(email) or
-            email.split("@")[0] not in GENERIC_LOCAL_PARTS):
+            email.split("@")[0] not in GENERIC_LOCAL_PARTS or
+            email.split("@")[1] in FREE_EMAIL_DOMAINS):
         return None
     osm_type = element.get("type")
     osm_id = element.get("id")
@@ -131,20 +137,38 @@ def mark_seen(row, keys):
 
 
 def validate_mode(mode, env):
-    if mode not in ("simular", "teste_escrita_2"):
-        raise RuntimeError("Modo não reconhecido: escrita recusada.")
-    if mode == "teste_escrita_2":
+    if mode not in ("simular", "teste_escrita_2", "diario"):
+        raise RuntimeError("Modo desconhecido: escrita recusada.")
+    if mode in ("teste_escrita_2", "diario"):
         required = {
-            "GITHUB_EVENT_NAME": "workflow_dispatch",
+            "GITHUB_REPOSITORY_ID": "1452563434",
             "GITHUB_REPOSITORY": "timesaverautomate/time-saver",
             "GITHUB_REF": "refs/heads/main",
             "GITHUB_WORKFLOW_REF": (
                 "timesaverautomate/time-saver/.github/workflows/"
                 "prospect-crm.yml@refs/heads/main"
             ),
+            "GITHUB_EVENT_NAME": ("schedule" if mode == "diario" else "workflow_dispatch"),
         }
         if any(env.get(key) != value for key, value in required.items()):
-            raise RuntimeError("Teste de escrita apenas manual, no workflow e branch autorizados.")
+            raise RuntimeError("Repositório ou evento não autorizado: escrita recusada.")
+    if mode == "diario" and env.get("CRM_DAILY_WRITE_ENABLED", "").lower() != "true":
+        print("ESCRITA DIÁRIA DESATIVADA: apenas simulação.")
+        return "simular"
+    return mode
+
+
+def today_lisbon():
+    return datetime.now(ZoneInfo("Europe/Lisbon")).date().isoformat()
+
+
+def count_imports_today(rows, day):
+    marker = AUTO_MARKER + day
+    return sum(1 for row in rows if len(row) > 16 and marker in str(row[16]))
+
+
+def daily_remaining(rows, day):
+    return max(0, MAX_DAILY_WRITES - count_imports_today(rows, day))
 
 
 def google_credentials():
@@ -166,6 +190,8 @@ def read_rows(credentials):
     rows = response.json().get("values", [])
     if not rows or rows[0] != HEADERS:
         raise RuntimeError("Cabeçalhos do CRM alterados: nenhuma escrita autorizada.")
+    if len(rows) >= 10000:
+        raise RuntimeError("Limite de leitura atingido: escrita recusada.")
     return rows[1:]
 
 
