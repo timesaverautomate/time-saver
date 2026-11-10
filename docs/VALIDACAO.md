@@ -1,5 +1,7 @@
 # Verificações realizadas e pendentes
 
+> Atualização de 10 de novembro de 2026: o teste técnico real do serviço Resend foi aceite e o titular confirmou a receção na caixa de entrada de timesaverautomate@gmail.com. [Execução verificada](https://github.com/usertechsitee/time-saver/actions/runs/42829562752) e [procedimento](TESTE-EMAIL.md). A chave permanece em GitHub Actions. A submissão através do formulário, a configuração no alojamento, o remetente de produção e os requisitos legais continuam pendentes. O relatório abaixo conserva o alcance das verificações originais.
+
 Data: 10 de novembro de 2026. Estes resultados correspondem ao código entregue, não a um serviço de email ou domínio de produção já configurado.
 
 ## Executado
