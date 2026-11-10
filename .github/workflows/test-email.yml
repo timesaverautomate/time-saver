@@ -1,8 +1,16 @@
 name: Testar envio de email
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/test-email.yml'
+      - 'scripts/test-email.mjs'
+      - 'scripts/run-email-diagnostic.mjs'
 permissions:
   contents: read
+  statuses: write
 concurrency:
   group: time-saver-email-diagnostic
   cancel-in-progress: false
@@ -15,7 +23,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Enviar teste para o titular da conta Resend
+      - name: Enviar teste para o titular da conta Resend e registar resultado
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-        run: node scripts/test-email.mjs
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/run-email-diagnostic.mjs
