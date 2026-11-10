@@ -1,5 +1,6 @@
 import { validateSubmission,readBoundedJSON,BodyTimeoutError } from './validation.mjs';
 import { keyedHash,sameDigest } from './security.mjs';
+import { storeQuote,markQuoteReceived } from './quote-sheets.mjs';
 
 const CONTACT_ORIGIN='https://timesaverautomate.com';
 const CONTACT_TO='timesaverautomate@gmail.com';
@@ -20,6 +21,7 @@ function contactEmail(data,reference,created){
 
 export function contactConfigured(env){
   return env.FORM_ENABLED==='true' && /^re_[A-Za-z0-9_-]{8,256}$/.test(env.RESEND_API_KEY||'')
+    && (env.QUOTE_CRM_ENABLED!=='true' || typeof env.GOOGLE_SERVICE_ACCOUNT_JSON==='string')
     && typeof env.SECURITY_HMAC_KEY==='string' && env.SECURITY_HMAC_KEY.length>=64
     && ['FORM_IP_RATE','FORM_EDGE_RATE','FORM_TOKEN_RATE'].every(key=>typeof env[key]?.limit==='function');
 }
@@ -110,6 +112,14 @@ export async function handleContact(request,env,transport=fetch){
     const fingerprint=await keyedHash(env.SECURITY_HMAC_KEY,'contact-send:'+ticket.nonce+':'+key.toLowerCase());
     const reference='TS-'+fingerprint.slice(0,20).toUpperCase();
     const text=contactEmail(data,reference,ticket.created);
+    // A escrita do CRM precede o Resend; não confirmar sem registo.
+    let quoteEntry=null;
+    if(env.QUOTE_CRM_ENABLED==='true'){
+      try { quoteEntry=await storeQuote(env,data,reference,Date.now()); }
+      catch { return contactJSON({
+        message:'Não foi possível registar o pedido neste momento. Os campos foram mantidos; tente novamente.'
+      },503); }
+    }
     const response=await transport('https://api.resend.com/emails',{
       method:'POST',redirect:'manual',signal:AbortSignal.timeout(12_000),
       headers:{Authorization:'Bearer '+env.RESEND_API_KEY,'Content-Type':'application/json','Idempotency-Key':'time-saver-contact/'+fingerprint},
@@ -117,7 +127,10 @@ export async function handleContact(request,env,transport=fetch){
         subject:'Time Saver — Novo pedido de orçamento',text})
     });
     const result=await response.json().catch(()=>null);
-    if(response.ok&&typeof result?.id==='string'&&result.id.length>0)return contactJSON({accepted:true,reference});
+    if(response.ok&&typeof result?.id==='string'&&result.id.length>0){
+      if(quoteEntry)await markQuoteReceived(quoteEntry,result.id).catch(()=>{});
+      return contactJSON({accepted:true,reference});
+    }
     if(response.status===409)return contactJSON({message:'O pedido está a ser processado ou foi alterado. Aguarde um momento e tente novamente com os mesmos dados.',
       renewKey:result?.name==='invalid_idempotent_request'},409,{'Retry-After':'3'});
     return contactJSON({message:'Não foi possível confirmar o envio. Os campos foram mantidos; aguarde um momento e tente novamente.'},502);
