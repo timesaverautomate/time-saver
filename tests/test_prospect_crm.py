@@ -83,12 +83,15 @@ class ProspectCrmTests(unittest.TestCase):
         older = []
         for i in range(29):
             old = crm.candidate(sample(name=f"Antiga {i}", email=f"info@old{i}.pt", osm_id=i + 100), "Porto")
+            old[3] = f"https://old{i}.pt"
             old[16] = "OSM público; " + crm.AUTO_MARKER + day
             older.append(old)
         news = [
             crm.candidate(sample(name="Nova Um", email="info@nova1.pt", osm_id=500), "Braga"),
             crm.candidate(sample(name="Nova Dois", email="info@nova2.pt", osm_id=501), "Braga"),
         ]
+        news[0][3] = "https://nova1.pt"
+        news[1][3] = "https://nova2.pt"
         fresh = crm.prepare_rows_for_write(older, news, 30, day)
         self.assertEqual(len(fresh), 1)
         self.assertEqual(fresh[0][24], "Sim")
