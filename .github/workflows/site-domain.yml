@@ -11,7 +11,7 @@ on:
 permissions: {}
 concurrency:
   group: time-saver-site-domain
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   configure:
     if: github.repository_id == '1452563434' && github.ref == 'refs/heads/main'

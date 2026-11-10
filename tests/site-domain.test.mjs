@@ -23,7 +23,7 @@ test('proxy do domínio reescreve caminhos e metadados e aplica cabeçalhos sem 
   assert.doesNotMatch(html,/github\.io|\/time-saver\//);
   assert.equal(forwarded.url,'https://timesaverautomate.github.io/time-saver/');
   assert.deepEqual(Object.keys(forwarded.options.headers),['Accept']);
-  assert.equal(forwarded.options.redirect,'error');
+  assert.equal(forwarded.options.redirect,'manual');
   assert.equal(response.headers.get('X-Frame-Options'),'DENY');
   assert.equal(response.headers.get('X-Content-Type-Options'),'nosniff');
   assert.equal(response.headers.get('Strict-Transport-Security'),'max-age=31536000');
@@ -61,7 +61,9 @@ test('proxy preserva PNG, responde a HEAD e bloqueia TLS antigo',async()=>{
 });
 test('proxy falha de forma fechada se a origem passar a incluir formulário ou devolver erros',async()=>{
   for(const fetcher of [async()=>new Response(originHTML+'<form></form>',{headers:{'Content-Type':'text/html'}}),
-    async()=>new Response('failure',{status:500}),async()=>{throw Error('internal-secret-not-for-public');}]) {
+    async()=>new Response('failure',{status:500}),
+    async()=>new Response(null,{status:302,headers:{Location:'https://untrusted.invalid/'}}),
+    async()=>{throw Error('internal-secret-not-for-public');}]) {
     const response=await proxyFetch(new Request('https://'+DOMAIN+'/'),{},fetcher);
     assert.equal(response.status,503);assert.equal(response.headers.get('Cache-Control'),'no-store');
     assert.doesNotMatch(await response.text(),/internal-secret|github\.io/);

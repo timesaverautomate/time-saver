@@ -56,7 +56,8 @@ export async function proxyFetch(request,env={},fetcher=globalThis.fetch) {
     }
     // Não reencaminhar cookies, autorização, origem, IPs ou parâmetros fornecidos no pedido.
     const upstream=await fetcher(ORIGIN+PREFIX+route,{
-      method:'GET',redirect:'error',signal:AbortSignal.timeout(15_000),
+      // No runtime Workers, manual é o modo que permite recusar redirecionamentos.
+      method:'GET',redirect:'manual',signal:AbortSignal.timeout(15_000),
       headers:{Accept:'text/html, text/css, application/javascript, image/*;q=0.8, */*;q=0.5'},
       cf:{cacheEverything:true,cacheTtlByStatus:{'200-299':60,'404':15,'500-599':0}}
     });
