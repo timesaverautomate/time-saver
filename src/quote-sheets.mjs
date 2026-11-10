@@ -105,23 +105,31 @@ export async function storeQuote(env,data,reference,received,{
   const access=await authorize(env,fetcher);
   const all=await rows(access,fetcher);
   const found=all.findIndex((r,i)=>i>0&&r[0]===reference);
-  if(found>=0)return {access,rowNumber:found+1,status:all[found][14]||'',duplicate:true};
+  if(found>=0)return {access,reference,rowNumber:found+1,status:all[found][14]||'',duplicate:true};
   const row=quoteRow(data,reference,received);
-  const result=await sheetCall(ROOT+'/values/'+APPEND+':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS',access,fetcher,{
+  // Append encontra o fim dos dados. OVERWRITE preenche a linha vazia já formatada,
+  // sem inserir outra linha que herde o texto branco do cabeçalho ou desloque regras.
+  const result=await sheetCall(ROOT+'/values/'+APPEND+':append?valueInputOption=RAW&insertDataOption=OVERWRITE',access,fetcher,{
     method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({values:[row]})
   });
   if(result.updates?.updatedRows!==1)throw Error('sheets_insert_unconfirmed');
   const verified=await rows(access,fetcher);
   const match=verified.map((r,i)=>r[0]===reference?i:-1).filter(i=>i>0);
   if(match.length!==1)throw Error('sheets_duplicate_or_missing');
-  return {access,rowNumber:match[0]+1,status:'Pendente envio',duplicate:false};
+  return {access,reference,rowNumber:match[0]+1,status:'Pendente envio',duplicate:false};
 }
 export async function markQuoteReceived(entry,providerId,{
   fetcher=fetch
 }={}){
   if(!entry||entry.status!=='Pendente envio')return;
-  const n=entry.rowNumber;
-  if(!Number.isInteger(n)||n<2||n>10000)throw Error('sheets_row_invalid');
+  if(!/^TS-[A-F0-9]{20}$/.test(entry.reference||''))throw Error('quote_reference_invalid');
+  // Uma ordenação manual pode mudar a posição. Localizar novamente pela referência
+  // e preservar um estado que o utilizador já tenha atualizado entretanto.
+  const current=await rows(entry.access,fetcher);
+  const matches=current.map((r,i)=>i>0&&r[0]===entry.reference?i:-1).filter(i=>i>0);
+  if(matches.length!==1)throw Error('sheets_duplicate_or_missing');
+  const n=matches[0]+1;
+  if(current[n-1][14]!=='Pendente envio')return;
   const iso=new Date().toISOString();
   await sheetCall(ROOT+'/values:batchUpdate',entry.access,fetcher,{
     method:'POST',headers:{'Content-Type':'application/json'},
