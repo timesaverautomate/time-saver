@@ -21,6 +21,10 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
       && env.CLOUDFLARE_API_TOKEN.length<=512 && !/[\s\x00-\x1f\x7f]/.test(env.CLOUDFLARE_API_TOKEN),'missing_cloudflare_token');
     requireDomain(typeof source==='string' && source.includes('timesaverautomate.github.io'),'invalid_proxy_source');
     const formRequested=env.FORM_ENABLED==='true';
+    const sheetRequested=formRequested&&env.QUOTE_CRM_ENABLED==='true';
+    if(sheetRequested)requireDomain(typeof env.GOOGLE_SERVICE_ACCOUNT_JSON==='string'
+      && env.GOOGLE_SERVICE_ACCOUNT_JSON.length>500
+      && env.GOOGLE_SERVICE_ACCOUNT_JSON.length<12000,'sheets_secret_missing');
     if(formRequested)requireDomain(/^re_[A-Za-z0-9_-]{8,256}$/.test(env.RESEND_API_KEY||''),'missing_resend_key');
     async function cf(endpoint,{method='GET',body,notFound=false,operation='cloudflare_request',credential=env.CLOUDFLARE_API_TOKEN}={}) {
       const headers={Authorization:'Bearer '+credential};
@@ -77,9 +81,12 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
       const form=new FormData();
       const bindings=[{type:'plain_text',name:'TIME_SAVER_REPOSITORY_ID',text:PROJECT},
         {type:'plain_text',name:'HSTS_ENABLED',text:String(hsts)},
-        {type:'plain_text',name:'FORM_ENABLED',text:String(formRequested)}];
+        {type:'plain_text',name:'FORM_ENABLED',text:String(formRequested)},
+        {type:'plain_text',name:'QUOTE_CRM_ENABLED',text:String(sheetRequested)}];
       if(formRequested){
         bindings.push({type:'secret_text',name:'RESEND_API_KEY',text:env.RESEND_API_KEY});
+        if(sheetRequested)bindings.push({type:'secret_text',
+          name:'GOOGLE_SERVICE_ACCOUNT_JSON',text:env.GOOGLE_SERVICE_ACCOUNT_JSON});
         if(hmac)bindings.push({type:'secret_text',name:'SECURITY_HMAC_KEY',text:hmac});
         bindings.push(...[
           ['FORM_IP_RATE','1452563434',5],['FORM_EDGE_RATE','1452563435',30],['FORM_TOKEN_RATE','1452563436',30]
@@ -90,7 +97,7 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
       form.set('proxy.mjs',new Blob([source],{type:'application/javascript+module'}),'proxy.mjs');
       for(const [name,contents] of Object.entries(modules)){
         if(name==='proxy.mjs')continue;
-        requireDomain(['contact.mjs','validation.mjs','security.mjs'].includes(name),'unexpected_worker_module');
+        requireDomain(['contact.mjs','validation.mjs','security.mjs','quote-sheets.mjs'].includes(name),'unexpected_worker_module');
         form.set(name,new Blob([contents],{type:'application/javascript+module'}),name);
       }
       await cf(base+'/workers/scripts/'+WORKER,{method:'PUT',body:form,operation:'worker_upload'});
@@ -162,7 +169,7 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
 export async function readProxySource(){return readFile(new URL('../src/site-proxy.mjs',import.meta.url),'utf8');}
 export async function readSiteModules(){
   const modules={};
-  for(const [name,file] of [['proxy.mjs','site-proxy.mjs'],['contact.mjs','contact.mjs'],['validation.mjs','validation.mjs'],['security.mjs','security.mjs']]){
+  for(const [name,file] of [['proxy.mjs','site-proxy.mjs'],['contact.mjs','contact.mjs'],['validation.mjs','validation.mjs'],['security.mjs','security.mjs'],['quote-sheets.mjs','quote-sheets.mjs']]){
     modules[name]=await readFile(new URL('../src/'+file,import.meta.url),'utf8');
   }
   return modules;
