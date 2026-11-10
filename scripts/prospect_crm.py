@@ -44,6 +44,7 @@ GENERIC_LOCAL_PARTS = {
 EMAIL_RE = re.compile(r"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$", re.I)
 MAX_TEST_WRITES = 2
 MAX_DAILY_WRITES = 30
+DAILY_WRITE_APPROVED_IN_CODE = False  # Libertar apenas após validação operacional
 AUTO_MARKER = 'TSCRM_AUTO_DATE='
 FREE_EMAIL_DOMAINS = {'gmail.com', 'hotmail.com', 'outlook.com', 'live.com', 'yahoo.com', 'icloud.com', 'proton.me'}
 
@@ -152,6 +153,9 @@ def validate_mode(mode, env):
         }
         if any(env.get(key) != value for key, value in required.items()):
             raise RuntimeError("Repositório ou evento não autorizado: escrita recusada.")
+    if mode == "diario" and not DAILY_WRITE_APPROVED_IN_CODE:
+        print("ESCRITA DIÁRIA BLOQUEADA: validação operacional pendente.")
+        return "simular"
     if mode == "diario" and env.get("CRM_DAILY_WRITE_ENABLED", "").lower() != "true":
         print("ESCRITA DIÁRIA DESATIVADA: apenas simulação.")
         return "simular"
