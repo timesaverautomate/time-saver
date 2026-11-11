@@ -115,7 +115,7 @@ class ProspectCrmTests(unittest.TestCase):
             raise_for_status=lambda: None,
             json=lambda: {"values": [crm.REVIEW_HEADERS, review]},
         )
-        with patch.object(crm.requests, "get", return_value=fake) as get, \\
+        with patch.object(crm.requests, "get", return_value=fake) as get, \
              patch.object(crm.requests, "post") as post:
             result = crm.simulate_resend(SimpleNamespace(token="fake"), [row])
         self.assertEqual(result["eligible"], 0)
