@@ -339,7 +339,7 @@ def publish_summary(mode, before, found, written, status="Concluído"):
         "- Contactos novos: **bloqueados até verificação manual**",
     ]
     with open(path, "a", encoding="utf-8") as handle:
-        handle.write("\\n".join(lines) + "\\n")
+        handle.write("\n".join(lines) + "\n")
 
 
 
