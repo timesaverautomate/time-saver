@@ -7,7 +7,7 @@ import time
 import unicodedata
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, quote
 
 import requests
 from google.auth.transport.requests import Request
@@ -186,11 +186,17 @@ def google_credentials():
 
 def read_rows(credentials):
     response = requests.get(
-        f"{API}/values/Empresas%21A1%3AZ10000",
+        f"{API}/values/{quote(chr(39) + 'Empresas' + chr(39) + '!A1:Z10000', safe='')}",
         headers={"Authorization": "Bearer " + credentials.token},
         timeout=30,
     )
-    response.raise_for_status()
+    if not response.ok:
+        try:
+            detail = response.json().get("error", {})
+            message = detail.get("message", "Sem detalhe da API")
+        except ValueError:
+            message = "Resposta não JSON da API"
+        raise RuntimeError(f"Leitura Google Sheets HTTP {response.status_code}: {message}")
     rows = response.json().get("values", [])
     if not rows or rows[0] != HEADERS:
         raise RuntimeError("Cabeçalhos do CRM alterados: nenhuma escrita autorizada.")
