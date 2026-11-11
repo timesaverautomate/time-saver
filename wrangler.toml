@@ -4,9 +4,9 @@ compatibility_date = "2026-11-01"
 workers_dev = true
 
 [vars]
-RESEND_WEBHOOK_WRITE_ENABLED = "false"
+RESEND_WEBHOOK_WRITE_ENABLED = "true"
 
-# CRM writes disabled after successful one-message fixture test.
+# Temporary V26-only fixture write; revert immediately after verification.
 [[durable_objects.bindings]]
 name = "CRM_COORDINATOR"
 class_name = "CrmEventCoordinator"
