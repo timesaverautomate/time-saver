@@ -276,7 +276,7 @@ def proposal_content(row):
 def draft_proposal(row):
     """Rascunho interno; nunca envia mensagens."""
     subject, body = proposal_content(row)
-    return "RASCUNHO NÃO ENVIADO — Assunto: " + subject + "\\n" + body
+    return "RASCUNHO NÃO ENVIADO — Assunto: " + subject + "\n" + body
 
 
 
