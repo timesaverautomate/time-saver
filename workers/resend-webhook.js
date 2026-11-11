@@ -126,6 +126,46 @@ export async function verifySvix(body, headers, secret, now = Date.now()) {
   return (await verifySvixDetailed(body, headers, secret, now)).valid;
 }
 
+
+const CRM_ID = "1VYEBWJb_9cYGbO8nZa3d_qh1rLUH-H3xf-w4CnOLMS4";
+function b64url(bytes) { let s = ""; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+export async function googleToken(json, http = fetch) {
+  let c;
+  try { c = JSON.parse(json); } catch { throw Error("invalid_credentials"); }
+  if (c?.type !== "service_account" || !c.client_email || !c.private_key) throw Error("invalid_credentials");
+  const now = Math.floor(Date.now()/1000);
+  const enc = x => b64url(new TextEncoder().encode(JSON.stringify(x)));
+  const unsigned = enc({alg:"RS256",typ:"JWT"})+"."+enc({iss:c.client_email,scope:"https://www.googleapis.com/auth/spreadsheets.readonly",aud:"https://oauth2.googleapis.com/token",iat:now,exp:now+3600});
+  const der = Uint8Array.from(atob(c.private_key.replace(/-----[^-]+-----|\s/g,"")), x=>x.charCodeAt(0));
+  const key = await crypto.subtle.importKey("pkcs8",der,{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["sign"]);
+  const signature = b64url(new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5",key,new TextEncoder().encode(unsigned))));
+  const r = await http("https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion:unsigned+"."+signature})});
+  if (!r.ok) throw Error("google_auth_failed");
+  const result = await r.json();
+  if (!result.access_token) throw Error("google_auth_failed");
+  return result.access_token;
+}
+export function planCrmEvent(rows,event) {
+  const states = {"email.sent":"Enviado","email.delivered":"Entregue","email.bounced":"Bounce","email.complained":"Spam","email.delivery_delayed":"Entrega atrasada","email.failed":"Erro"};
+  const matches = [];
+  for(let i=1;i<rows.length;i++) if(String(rows[i]?.[22]??"").trim()===event.data.email_id) matches.push(i+1);
+  if(matches.length>1) throw Error("duplicate_message_id");
+  if(!matches.length) return {matched:false,planned_cells:0};
+  const row=rows[matches[0]-1], current=String(row[21]??"").trim(), next=states[event.type];
+  const blocked=new Set(["Bounce","Spam","Cancelou subscrição"]);
+  if(blocked.has(current)&&!blocked.has(next)) return {matched:true,planned_cells:0};
+  return {matched:true,planned_cells:Number(current!==next)+Number(blocked.has(next)&&String(row[24]??"").trim().toLowerCase()!=="sim")};
+}
+export async function checkCrm(json,event,http=fetch) {
+  const token=await googleToken(json,http);
+  const url="https://sheets.googleapis.com/v4/spreadsheets/"+CRM_ID+"/values/"+encodeURIComponent("'Pedidos'!A1:Z5000");
+  const r=await http(url,{headers:{authorization:"Bearer "+token}});
+  if(!r.ok) throw Error("google_sheet_read_failed");
+  const data=await r.json();
+  if(!Array.isArray(data.values)||data.values[0]?.[22]!=="ID mensagem Resend") throw Error("crm_schema_mismatch");
+  return planCrmEvent(data.values,event);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -162,8 +202,16 @@ export default {
       || event.data.email_id.length > 200 || /[\x00-\x20\x7f]/.test(event.data.email_id)) {
       return response({ error: "missing_email_id" }, 400);
     }
-    // Não escrever no CRM, mesmo que a flag seja alterada, até implementarmos
-    // autenticação Google, deduplicação e testes end-to-end.
-    return response({ accepted: true, mode: "dry_run", crm_writes_enabled: false });
+    // Read-only integration: no CRM writes, even when the flag is changed.
+    if (!env?.GOOGLE_SERVICE_ACCOUNT_JSON) return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:"credentials_missing"});
+    try {
+      const plan=await checkCrm(env.GOOGLE_SERVICE_ACCOUNT_JSON,event);
+      return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:"ok",...plan});
+    } catch(error) {
+      const safe=new Set(["invalid_credentials","google_auth_failed","google_sheet_read_failed","crm_schema_mismatch","duplicate_message_id"]);
+      const reason=safe.has(error?.message)?error.message:"crm_check_failed";
+      console.warn("resend_crm_read_only_check_failed",reason);
+      return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:reason});
+    }
   },
 };
