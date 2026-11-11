@@ -245,8 +245,8 @@ if (form) {
   const editableFields=Array.from(form.querySelectorAll('input,textarea,select'));
   const limits = {name:[2,100],email:[3,254],description:[description.minLength>0?description.minLength:30,description.maxLength>0?description.maxLength:4000],company:[0,160],tools:[0,500],specifics:[0,500]};
   const labels = isEN
-    ? {name:'Name',email:'Contact email',description:'Process description',company:'Company',tools:'Tools',service:'Type of help',budget:'Budget',deadline:'Preferred deadline',goal:'Main goal',frequency:'Frequency',startingPoint:'Starting point',specifics:'Details'}
-    : {name:'Nome',email:'Email de contacto',description:'Descrição do processo',company:'Empresa',tools:'Ferramentas',service:'Tipo de ajuda',budget:'Orçamento',deadline:'Prazo',goal:'Objetivo',frequency:'Frequência',startingPoint:'Ponto de partida',specifics:'Detalhes'};
+    ? {name:'Name/Company',email:'Contact email',description:'Process description',company:'Company',tools:'Tools',service:'Areas of help',budget:'Budget',deadline:'Preferred deadline',goal:'Main goal',frequency:'Frequency',startingPoint:'Starting point',specifics:'Details'}
+    : {name:'Nome/Empresa',email:'Email de contacto',description:'Descrição do processo',company:'Empresa',tools:'Ferramentas',service:'Áreas de ajuda',budget:'Orçamento',deadline:'Prazo',goal:'Objetivo',frequency:'Frequência',startingPoint:'Ponto de partida',specifics:'Detalhes'};
   const context = isEN ? {
     'Excel, macros e VBA':['Tell us which files you use, what you do manually and what you would like to automate.','For example: every month we combine several Excel files and repeat the same calculations and formatting. We would like to prepare everything in one step.','Are there any important rules or calculations?'],
     'Automação de processos':['Describe the steps, who is involved and where work is repeated.','For example: we copy requests received by email into a spreadsheet, then notify the team. We would like to reduce these manual steps.','Which steps are currently done manually?'],
@@ -321,9 +321,9 @@ if (form) {
   function summaryValue(name,data) {
     const nodes=fieldNodes(name),field=nodes[0];
     if(field?.tagName==='SELECT')return field.selectedOptions[0]?.textContent.trim()||data[name];
-    if(field?.type==='radio'){
-      const selected=nodes.find(node=>node.checked);
-      return selected?.closest('label')?.querySelector('strong')?.textContent.trim()||data[name];
+    if(name==='service'){
+      return nodes.filter(node=>node.checked).map(node=>
+        node.closest('label')?.querySelector('strong')?.textContent.trim()||node.value).join(' · ');
     }
     return data[name]||'';
   }
@@ -356,18 +356,37 @@ if (form) {
     setQuoteStep(target);
   }
   const fieldNodes = name => Array.from(form.querySelectorAll('[name="'+name+'"]'));
+  const serviceFields = fieldNodes('service');
+  const serviceValues = new Set(serviceFields.map(field=>field.value));
+  const unsureService = serviceFields.find(field=>field.value==='Ainda não sei');
+  const selectedServices = () => serviceFields.filter(field=>field.checked).map(field=>field.value);
   function focusField(name) {
     revealQuoteField(name);
     const fields=fieldNodes(name); (fields.find(field=>field.checked)||fields[0])?.focus();
   }
   function updateServiceContext() {
-    const values=context[form.elements.service?.value]||context['Ainda não sei'];
+    const selected=selectedServices();
+    const values=selected.length>1 ? [
+      translate('Escolheu várias áreas. Explique como se ligam no seu processo e o que gostaria de simplificar.','You selected several areas. Explain how they fit into your process and what you would like to simplify.'),
+      translate('Por exemplo: queremos reunir dados de vários ficheiros Excel, automatizar os passos repetitivos e preparar um dashboard atualizado.','For example: we would like to combine data from several Excel files, automate repetitive steps and prepare an up-to-date dashboard.'),
+      translate('Há alguma regra ou ligação entre estas áreas que devamos conhecer?','Are there any rules or connections between these areas we should know about?')
+    ] : context[selected[0]]||context['Ainda não sei'];
     const guidance=document.querySelector('#service-guidance');
     if(guidance)guidance.textContent=values[0];
     description.placeholder=values[1];
     const label=document.querySelector('#specifics-label');if(label)label.textContent=values[2];
+    const count=document.querySelector('#service-selection-count');
+    if(count)count.textContent=selected.length===1&&selected[0]==='Ainda não sei'
+      ?translate('Ajudamos a escolher a melhor solução.','We’ll help you find the right solution.')
+      :translate(selected.length+' '+(selected.length===1?'área selecionada':'áreas selecionadas'),
+        selected.length+' '+(selected.length===1?'area selected':'areas selected'));
   }
-  fieldNodes('service').forEach(field=>field.addEventListener('change',updateServiceContext));
+  serviceFields.forEach(field=>field.addEventListener('change',()=>{
+    if(field.checked && field===unsureService)serviceFields.forEach(other=>{if(other!==field)other.checked=false;});
+    else if(field.checked && unsureService)unsureService.checked=false;
+    if(!selectedServices().length && unsureService)unsureService.checked=true;
+    updateServiceContext();
+  }));
   updateServiceContext();
   function updateCounter() {
     const counter=document.querySelector('#description-count');
@@ -463,13 +482,19 @@ if (form) {
   });
   function collect() {
     const data = {};
-    const defaults={service:'Ainda não sei',deadline:'A definir',budget:'A definir',goal:'A definir',frequency:'A definir',startingPoint:'A definir'};
+    const defaults={deadline:'A definir',budget:'A definir',goal:'A definir',frequency:'A definir',startingPoint:'A definir'};
     // A leitura opcional da política não é consentimento nem faz parte do pedido enviado.
-    ['name','email','description','company','service','tools','deadline','budget','website','goal','frequency','startingPoint','specifics'].forEach(name=>{data[name]=(form.elements[name]?.value||defaults[name]||'').trim().normalize('NFC');});
+    ['name','email','description','company','tools','deadline','budget','website','goal','frequency','startingPoint','specifics'].forEach(name=>{data[name]=(form.elements[name]?.value||defaults[name]||'').trim().normalize('NFC');});
+    data.service=selectedServices();
     return data;
   }
   function validate(data) {
     const errors = {};
+    if(!Array.isArray(data.service)||data.service.length<1||data.service.length>6
+      ||new Set(data.service).size!==data.service.length||data.service.some(value=>!serviceValues.has(value))
+      ||data.service.length>1&&data.service.includes('Ainda não sei')){
+      errors.service=translate('Selecione as áreas de ajuda ou escolha “Ainda não sei”.','Select the areas you need help with, or choose “Not sure yet”.');
+    }
     for (const [name,[min,max]] of Object.entries(limits)) {
       if (data[name].length < min || data[name].length > max) errors[name] = translate('Preencha entre '+min+' e '+max+' caracteres.','Enter between '+min.toLocaleString(locale)+' and '+max.toLocaleString(locale)+' characters.');
     }
