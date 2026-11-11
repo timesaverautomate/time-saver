@@ -168,7 +168,7 @@ export function planCrmEvent(rows,event) {
 export async function writePlannedCrmCells(credentialsJson, updates, http = fetch) {
   if (!Array.isArray(updates) || updates.length === 0) return {written_cells:0};
   if (updates.length > 2 || updates.some(u =>
-    !/^'Pedidos'![VY][2-9][0-9]*$/.test(u.range) ||
+    !/^'Pedidos'![VY](?:[2-9]|[1-9][0-9]+)$/.test(u.range) ||
     !Array.isArray(u.values) || u.values.length !== 1 ||
     !Array.isArray(u.values[0]) || u.values[0].length !== 1 ||
     typeof u.values[0][0] !== "string" ||
