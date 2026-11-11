@@ -3,10 +3,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Simular ou testar escrita de 2 empresas (sem emails)'
+        description: 'Pesquisar, simular elegibilidade Resend ou testar escrita (sem emails)'
         required: true
         type: choice
-        options: [simular, teste_escrita_2]
+        options: [simular, simular_resend, teste_escrita_2]
         default: simular
   schedule:
     - cron: '15 8 * * *'
@@ -48,7 +48,7 @@ jobs:
         run: pip install google-auth requests
       - name: Testes de seguranca do CRM
         run: python -m unittest discover -s tests -p 'test_prospect_crm.py' -v
-      - name: Pesquisa CRM (sem envios)
+      - name: Pesquisa ou simulação Resend (sem envios)
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           CRM_MODE: ${{ github.event_name == 'schedule' && 'diario' || inputs.mode || 'simular' }}
