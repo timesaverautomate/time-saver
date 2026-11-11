@@ -200,8 +200,8 @@ export async function checkCrm(json,event,http=fetch) {
 }
 
 
-// Durable Object reserved for serialized CRM updates. This first stage is
-// deliberately inert: no webhook routes requests here and no Sheets writes occur.
+// All authenticated CRM checks pass through one Durable Object instance.
+// The coordinator serializes read/plan operations; writes remain disabled.
 export class CrmEventCoordinator {
   constructor(state, env) {
     this.state = state;
@@ -209,10 +209,31 @@ export class CrmEventCoordinator {
     this.pending = Promise.resolve();
   }
   async fetch(request) {
-    // Only accept an explicit internal health probe; never write on this path.
-    if (new URL(request.url).pathname === "/internal/health" && request.method === "GET")
+    const path = new URL(request.url).pathname;
+    if (path === "/internal/health" && request.method === "GET")
       return response({status:"ready",crm_writes_enabled:false});
-    return response({error:"not_found"},404);
+    if (path !== "/internal/check" || request.method !== "POST")
+      return response({error:"not_found"},404);
+    // This route is reachable only through the Worker binding, not via public URL.
+    const task = this.pending.catch(()=>{}).then(async () => {
+      let event;
+      try { event=await request.json(); } catch { return response({error:"invalid_json"},400); }
+      if (!types.has(event?.type) || typeof event?.data?.email_id !== "string")
+        return response({error:"invalid_crm_event"},400);
+      if (!this.env?.GOOGLE_SERVICE_ACCOUNT_JSON)
+        return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:"credentials_missing"});
+      try {
+        const plan=await checkCrm(this.env.GOOGLE_SERVICE_ACCOUNT_JSON,event);
+        return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:"ok",...plan});
+      } catch(error) {
+        const safe=new Set(["invalid_credentials","google_auth_failed","google_sheet_read_failed","crm_schema_mismatch","duplicate_message_id"]);
+        const reason=safe.has(error?.message)?error.message:"crm_check_failed";
+        console.warn("resend_crm_coordinator_check_failed",reason);
+        return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:reason});
+      }
+    });
+    this.pending=task.then(()=>{},()=>{});
+    return task;
   }
 }
 
@@ -252,16 +273,17 @@ export default {
       || event.data.email_id.length > 200 || /[\x00-\x20\x7f]/.test(event.data.email_id)) {
       return response({ error: "missing_email_id" }, 400);
     }
-    // Read-only integration: no CRM writes, even when the flag is changed.
-    if (!env?.GOOGLE_SERVICE_ACCOUNT_JSON) return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:"credentials_missing"});
+    // Fail closed: coordinator is mandatory; never fall back to uncoordinated writes.
+    if (!env?.CRM_COORDINATOR) return response({error:"coordinator_unavailable"},503);
     try {
-      const plan=await checkCrm(env.GOOGLE_SERVICE_ACCOUNT_JSON,event);
-      return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:"ok",...plan});
-    } catch(error) {
-      const safe=new Set(["invalid_credentials","google_auth_failed","google_sheet_read_failed","crm_schema_mismatch","duplicate_message_id"]);
-      const reason=safe.has(error?.message)?error.message:"crm_check_failed";
-      console.warn("resend_crm_read_only_check_failed",reason);
-      return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:reason});
+      const id=env.CRM_COORDINATOR.idFromName("crm-global");
+      return await env.CRM_COORDINATOR.get(id).fetch(
+        new Request("https://internal.invalid/internal/check",{method:"POST",
+          headers:{"content-type":"application/json"},body:JSON.stringify(event)})
+      );
+    } catch {
+      console.warn("resend_crm_coordinator_unavailable");
+      return response({error:"coordinator_unavailable"},503);
     }
   },
 };
