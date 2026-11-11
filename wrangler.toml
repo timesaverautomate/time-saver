@@ -1,0 +1,7 @@
+name = "timesaver-resend-webhook"
+main = "workers/resend-webhook.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[vars]
+RESEND_WEBHOOK_WRITE_ENABLED = "false"
