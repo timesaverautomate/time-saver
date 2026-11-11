@@ -268,6 +268,9 @@ def proposal_content(row):
         "ser simplificados ou automatizados.\n\n"
         "Teriam disponibilidade para uma breve reunião, sem compromisso, "
         "para explorarmos possíveis oportunidades?\n\n"
+        "Em alternativa, podem visitar o nosso site e solicitar diretamente um "
+        "orçamento, sem compromisso:\n\n"
+        "https://timesaverautomate.com\n\n"
         "Cumprimentos,\nEquipa TimeSaver"
     )
     return subject, body
