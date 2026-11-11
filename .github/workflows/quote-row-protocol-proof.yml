@@ -1,0 +1,34 @@
+name: Provar protocolo CRM numa folha temporária
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/quote-row-protocol-proof.yml'
+      - 'scripts/quote-row-protocol.mjs'
+      - 'scripts/verify-quote-row-protocol.mjs'
+permissions:
+  contents: read
+concurrency:
+  group: time-saver-quote-row-proof
+  cancel-in-progress: false
+jobs:
+  validate-only:
+    if: github.repository_id == '1452563434' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Verificar sintaxe da prova isolada
+        run: |
+          node --check scripts/quote-row-protocol.mjs
+          node --check scripts/verify-quote-row-protocol.mjs
+      - name: Provar ordenação, âncora e fórmula sem publicar código de produção
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: node scripts/verify-quote-row-protocol.mjs
