@@ -21,6 +21,7 @@ name: TimeSaver - prospeção aprovada e reconciliação Resend
       - 'tests/test_outreach_approved.py'
   schedule:
     - cron: '30 9 * * 1-5'
+    - cron: '30 15 * * 1-5' # Segunda janela para autorizações obtidas durante o dia
     - cron: '30 16 * * *'
 permissions:
   contents: read
