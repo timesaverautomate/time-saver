@@ -151,7 +151,7 @@ def mark_seen(row, keys):
 
 
 def validate_mode(mode, env):
-    if mode not in ("simular", "teste_escrita_2", "diario"):
+    if mode not in ("simular", "simular_resend", "teste_escrita_2", "diario"):
         raise RuntimeError("Modo desconhecido: escrita recusada.")
     if mode in ("teste_escrita_2", "diario"):
         required = {
@@ -311,6 +311,56 @@ def review_row(crm_row, line_number):
          else "Domínios diferentes (rever)"),
         "Por verificar", "", f"Score comercial: {prospect_score(crm_row)}/9; " + draft_proposal(crm_row), str(line_number),
     ]
+
+
+
+def simulate_resend(credentials, crm_rows, limit=30):
+    """Simulação integral de elegibilidade e payload Resend; sem chamadas à Resend."""
+    response = requests.get(
+        f"{API}/values/{quote(chr(39) + 'Revisão Comercial' + chr(39) + '!A1:L10000', safe='')}",
+        headers={"Authorization": "Bearer " + credentials.token},
+        timeout=30,
+    )
+    response.raise_for_status()
+    values = response.json().get("values", [])
+    if not values or values[0] != REVIEW_HEADERS:
+        raise RuntimeError("Cabeçalhos de revisão inválidos: simulação interrompida.")
+    review_by_line = {str(r[11]).strip(): r for r in values[1:] if len(r) > 11}
+    blocked = {}
+    eligible = []
+    for line, crm_row in enumerate(crm_rows, start=2):
+        if not crm_row or not crm_row[0]:
+            continue
+        review = review_by_line.get(str(line))
+        if not review or norm(review[0]) != norm(crm_row[0]):
+            reason = "Revisão ausente ou não corresponde ao CRM"
+            allowed = False
+        else:
+            allowed, reason = evaluate_send_eligibility(crm_row, review)
+        if not allowed:
+            blocked[reason] = blocked.get(reason, 0) + 1
+            continue
+        eligible.append((prospect_score(crm_row), crm_row))
+    eligible.sort(key=lambda pair: pair[0], reverse=True)
+    selected = eligible[:limit]
+    print(f"SIMULAÇÃO RESEND: {len(crm_rows)} empresas; {len(eligible)} elegíveis; {len(selected)} selecionadas; 0 envios.")
+    for reason, count in sorted(blocked.items()):
+        print(f"Bloqueados — {reason}: {count}")
+    for score, row in selected:
+        # Preview sem expor emails nos logs de execução.
+        print(f"Proposta simulada: score={score}; setor={str(row[1])[:70]}; assunto=TimeSaver — oportunidades de automação")
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if path:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(
+                "\\n## TimeSaver — simulação Resend (sem envio)\\n"
+                f"- Contactos avaliados: {len(crm_rows)}\\n"
+                f"- Elegíveis: {len(eligible)}\\n"
+                f"- Selecionados (máximo {limit}): {len(selected)}\\n"
+                "- Emails enviados: **0**\\n"
+            )
+    return {"eligible": len(eligible), "selected": len(selected), "blocked": blocked}
+
 
 
 def sync_review(credentials, crm_rows):
@@ -499,6 +549,9 @@ def main():
     existing = read_rows(credentials)
     day = today_lisbon()
     print(f"CRM consultado: {len(existing)} empresas. Modo: {mode}.", flush=True)
+    if mode == "simular_resend":
+        simulate_resend(credentials, existing)
+        return
     if mode in ("diario", "teste_escrita_2"):
         sync_review(credentials, existing)
     if mode == "diario":
