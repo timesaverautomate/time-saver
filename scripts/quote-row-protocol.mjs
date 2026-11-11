@@ -1,7 +1,7 @@
 // Protocolo candidato isolado: só é importado pela prova temporária, nunca pelo backend ativo.
 import {QUOTE_HEADERS} from '../src/quote-sheets.mjs';
 const MARKER_KEY='tq';
-export const QUOTE_STATUS_FORMULA='=IF(INDEX(R:R,ROW())="","Pendente envio","Novo")';
+export const QUOTE_STATUS_FORMULA='=IF(INDEX(R:R;ROW())="";"Pendente envio";"Novo")';
 export function quoteInsertRequests(sheetId,row,metadataId,reference){
   if(!Number.isInteger(sheetId)||sheetId<0||!Number.isInteger(metadataId)||metadataId<=0||metadataId>0x7fffffff
     ||!/^TS-[A-F0-9]{20}$/.test(reference)||!Array.isArray(row)||row.length!==QUOTE_HEADERS.length

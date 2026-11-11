@@ -54,6 +54,8 @@ export async function verifyQuoteAtomicProvider({env=process.env,fetcher=fetch,a
       const locale=(await localeResponse.json())?.properties?.locale;
       if(typeof locale==='string'&&/^[a-z]{2}(?:[_-][A-Za-z]{2})?$/.test(locale))diagnostic.locale=locale;
     }
+    diagnostic.stage='locale';
+    if(diagnostic.locale!=='pt_PT')throw Error('atomic_probe_locale_mismatch');
     diagnostic.stage='setup';sheetId=randomID();const markerId=randomID(),otherMarkerId=randomID();
     title='TS-Teste-Atomic-'+uuid().slice(0,8);
     if([sheetId,markerId,otherMarkerId].some(id=>!Number.isInteger(id)||id<=0||id>0x7fffffff)
@@ -97,7 +99,7 @@ export async function verifyQuoteAtomicProvider({env=process.env,fetcher=fetch,a
           const cell=(await detail.json())?.sheets?.[0]?.data?.[0]?.rowData?.[0]?.values?.[0];
           diagnostic.originalFormulaMatches=cell?.userEnteredValue?.formulaValue===QUOTE_STATUS_FORMULA;
           const errorType=cell?.effectiveValue?.errorValue?.type;
-          if(typeof errorType==='string'&&/^[A-Z_]{1,40}$/.test(errorType))diagnostic.originalFormulaErrorType=errorType;
+          if(['ERROR','NULL_VALUE','DIVIDE_BY_ZERO','VALUE','REF','NAME','NUM','N_A','LOADING','ERROR_TYPE_UNSPECIFIED'].includes(errorType))diagnostic.originalFormulaErrorType=errorType;
         }
         if(diagnostic.formulaStatus!=='Pendente envio'){
           const alternate='=IF(INDEX(R:R;ROW())="";"Pendente envio";"Novo")';
