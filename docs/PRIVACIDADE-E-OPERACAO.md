@@ -1,5 +1,7 @@
 # Privacidade, segurança e operação
 
+> Nota de arquitetura: as referências a D1 e ao adaptador de email original abaixo são históricas. O site público atual usa GitHub Pages e o Worker `src/site-proxy.mjs`, contadores nativos da Cloudflare, Resend e o CRM privado em Google Sheets. Consulte [FORMULARIO-EMAIL.md](FORMULARIO-EMAIL.md), [SEGURANCA-VALIDACAO-2026-11-11.md](SEGURANCA-VALIDACAO-2026-11-11.md) e a auditoria final para o funcionamento verificado. Não interpretar os limites ou prazos históricos de D1 como configuração ativa.
+
 ## Decisões de arquitetura
 
 Na instalação GitHub Pages, o browser envia JSON para um endpoint HTTPS explicitamente configurado. A API separada valida a origem exata e aplica CORS restrito; isto não é uma proteção suficiente contra bots. O modo original da mesma origem continua suportado. Não existem sessões, contas, ficheiros anexos ou fluxos de pagamento. O servidor valida, aplica limites e bloqueios e envia um email de texto através de Resend. Os pedidos completos não são gravados em D1.

@@ -67,3 +67,49 @@ test('auditoria deteta token Resend com hífen no histórico sem divulgar o valo
     assert.equal(data.secret_values_printed,false);
   } finally {rmSync(repo.directory,{recursive:true,force:true});}
 });
+test('auditoria deteta PEM de conta Google em JSON e em JSON escapado sem divulgar o conteúdo',()=>{
+  for(const [escapedAgain,newline] of [[false,'\n'],[true,'\n'],[false,'\r\n'],[true,'\r\n']]){
+    const repo=repository();
+    try {
+      const key='-----BEGIN '+'PRIVATE KEY-----'+newline+'A'.repeat(64)+newline+'-----END '+'PRIVATE KEY-----'+newline;
+      const account={type:'service_account',private_key:key,client_email:'synthetic@example.invalid'};
+      const serialized=escapedAgain?JSON.stringify(JSON.stringify(account)):JSON.stringify(account);
+      writeFileSync(path.join(repo.directory,'service-account.json'),serialized);repo.commit();
+      writeFileSync(path.join(repo.directory,'service-account.json'),'{}');repo.commit();
+      const result=spawnSync('python',[script,'--repository',repo.directory],{encoding:'utf8'});
+      const data=JSON.parse(result.stdout);
+      assert.equal(result.status,1);assert.equal(data.passed,false);
+      assert.equal(data.commits_checked,2);
+      assert.ok(data.findings.some(finding=>finding.rule==='private-key'&&finding.path==='service-account.json'));
+      assert.equal((result.stdout+result.stderr).includes(serialized),false);
+      assert.equal((result.stdout+result.stderr).includes('A'.repeat(64)),false);
+      assert.equal(data.secret_values_printed,false);
+    } finally {rmSync(repo.directory,{recursive:true,force:true});}
+  }
+});
+test('auditoria deteta segredo Svix/Resend apagado do histórico sem imprimir o valor',()=>{
+  const repo=repository();
+  try {
+    const fixture='whsec_'+'A'.repeat(36)+'+/==';
+    writeFileSync(path.join(repo.directory,'.env'),'RESEND_WEBHOOK_SECRET="'+fixture+'"\n');repo.commit();
+    writeFileSync(path.join(repo.directory,'.env'),'RESEND_WEBHOOK_SECRET=\n');repo.commit();
+    const result=spawnSync('python',[script,'--repository',repo.directory],{encoding:'utf8'});
+    const data=JSON.parse(result.stdout);
+    assert.equal(result.status,1);assert.equal(data.passed,false);
+    assert.ok(data.findings.some(finding=>finding.rule==='svix-signing-secret'&&finding.path==='.env'));
+    assert.equal((result.stdout+result.stderr).includes(fixture),false);
+    assert.equal(data.secret_values_printed,false);
+  } finally {rmSync(repo.directory,{recursive:true,force:true});}
+});
+test('padrões e instruções de segredos escapados não geram falsos positivos',()=>{
+  const repo=repository();
+  try {
+    writeFileSync(path.join(repo.directory,'instructions.txt'),[
+      'Use um segredo com prefixo whsec_ no gestor da plataforma.',
+      String.raw`r"\bwhsec_[A-Za-z0-9+/=_-]{24,}"`,
+      String.raw`-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----`,
+    ].join('\n'));repo.commit();
+    const result=spawnSync('python',[script,'--repository',repo.directory],{encoding:'utf8'});
+    assert.equal(result.status,0);assert.equal(JSON.parse(result.stdout).passed,true);
+  } finally {rmSync(repo.directory,{recursive:true,force:true});}
+});

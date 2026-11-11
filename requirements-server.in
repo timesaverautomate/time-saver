@@ -1,0 +1,4 @@
+# Servidor WSGI opcional do webhook em Python 3.12; não é usado pelo Worker.
+# Manter compatibilidade com as bibliotecas já bloqueadas do CRM.
+-c requirements-crm.txt
+gunicorn>=27,<28

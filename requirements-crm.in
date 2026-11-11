@@ -1,0 +1,7 @@
+# Ferramentas e testes internos do CRM em Python 3.12.
+# As versões Google são partilhadas com o diagnóstico de leitura.
+-c requirements-google.txt
+google-auth
+requests
+flask>=3.0,<4
+svix>=2.0,<3

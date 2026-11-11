@@ -1,0 +1,5 @@
+# Gestão Google/CRM em Python 3.12. Não são dependências do website público.
+# Atualizar este bloqueio antes de regenerar requirements-crm.txt.
+# Regenerar com pip-tools 7.6.2, --upgrade e --generate-hashes; rever os testes.
+google-auth>=2.0,<3
+requests>=2.31,<3

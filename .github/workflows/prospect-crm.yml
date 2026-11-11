@@ -20,6 +20,13 @@ on:
       - 'tests/test_resend_events.py'
       - 'scripts/resend_webhook.py'
       - 'tests/test_resend_webhook.py'
+      - 'requirements-google.in'
+      - 'requirements-google.txt'
+      - 'requirements-crm.in'
+      - 'requirements-crm.txt'
+      - 'requirements-server.in'
+      - 'requirements-server.txt'
+      - 'requirements-webhook.txt'
 permissions:
   contents: read
 concurrency:
@@ -31,25 +38,39 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
+      - name: Auditar histórico antes de instalar ferramentas
+        run: python scripts/audit-repository-secrets.py
       - name: Instalar dependencias
-        run: pip install google-auth requests flask svix
+        run: >-
+          python -m pip install --index-url https://pypi.org/simple --require-hashes --only-binary=:all: -r requirements-webhook.txt
       - name: Testes de seguranca sem pesquisa ou escrita
         run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Validar servidor opcional sem receber pedidos
+        run: PYTHONPATH=scripts gunicorn --check-config resend_webhook:app
   pesquisar:
-    if: github.event_name != 'push'
+    if: github.repository_id == '1452563434' && github.ref == 'refs/heads/main' && github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
+      - name: Auditar histórico antes de usar credenciais externas
+        run: python scripts/audit-repository-secrets.py
       - name: Instalar dependencias
-        run: pip install google-auth requests flask svix
+        run: >-
+          python -m pip install --index-url https://pypi.org/simple --require-hashes --only-binary=:all: -r requirements-crm.txt
       - name: Testes de seguranca do CRM
         run: python -m unittest discover -s tests -p 'test_*.py' -v
       - name: Pesquisa ou simulação Resend (sem envios)

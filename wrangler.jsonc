@@ -5,10 +5,10 @@
   "compatibility_date": "2026-11-01",
   "workers_dev": false,
   "observability": {
-    "enabled": true,
+    "enabled": false,
     "logs": {
-      "enabled": true,
-      "invocation_logs": true
+      "enabled": false,
+      "invocation_logs": false
     }
   },
   "vars": {

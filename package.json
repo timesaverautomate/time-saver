@@ -12,6 +12,6 @@
     "test": "node scripts/build.mjs && node --experimental-sqlite --test tests/*.test.mjs",
     "preflight": "node scripts/preflight.mjs",
     "check": "node --check src/worker.mjs && node --check public/app.js && npm test && npm run build",
-    "deploy": "wrangler deploy"
+    "deploy": "node scripts/run-site-domain.mjs"
   }
 }

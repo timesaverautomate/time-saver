@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import webhook, { verifySvix, verifySvixDetailed, readWebhookBody, WebhookBodyError, planCrmEvent, writePlannedCrmCells } from '../workers/resend-webhook.js';
+import webhook, { verifySvix, verifySvixDetailed, readWebhookBody, WebhookBodyError, planCrmEvent, writePlannedCrmCells, googleToken, checkCrm, CrmEventCoordinator } from '../workers/resend-webhook.js';
 
 const NOW = 1794384000000;
 const SECRET = 'whsec_' + btoa('synthetic-webhook-key-for-tests!!');
@@ -228,4 +228,208 @@ test('CRM write adapter rejects unsafe ranges without contacting Google', async 
  for(const updates of forbidden)
    await assert.rejects(writePlannedCrmCells("not-a-key",updates,()=>{throw Error("network_called")}),/invalid_crm_updates/);
  assert.deepEqual(await writePlannedCrmCells("not-a-key",[]),{written_cells:0});
+});
+
+let credentialsPromise;
+function syntheticGoogleCredentials() {
+  credentialsPromise ??= (async()=>{
+    const pair=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,
+      publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
+    const bytes=new Uint8Array(await crypto.subtle.exportKey('pkcs8',pair.privateKey));
+    return JSON.stringify({type:'service_account',client_email:'synthetic@example.invalid',
+      private_key:'-----BEGIN PRIVATE KEY-----\n'+btoa(String.fromCharCode(...bytes))+'\n-----END PRIVATE KEY-----'});
+  })();
+  return credentialsPromise;
+}
+function crmRows(id='synthetic-message-id',status='Enviado') {
+  const header=Array(26).fill('');header[22]='ID mensagem Resend';
+  const row=Array(26).fill('');row[22]=id;row[21]=status;row[24]='Não';
+  return [header,row];
+}
+const coordinatorRequest=event=>new Request('https://internal.invalid/internal/check',{
+  method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(event)});
+const deliveredEvent={type:'email.delivered',data:{email_id:'synthetic-message-id'}};
+const fixtureEvent={type:'email.delivered',data:{email_id:'01a1ca94-4663-7eee-93bc-6fd01eccf4f4'}};
+
+test('OAuth, leitura e escrita Google têm prazo de 12 segundos e recusam seguir redirecionamentos',async t=>{
+  const credentials=await syntheticGoogleCredentials(),calls=[],timeouts=[];
+  t.mock.method(AbortSignal,'timeout',milliseconds=>{
+    timeouts.push(milliseconds);return new AbortController().signal;
+  });
+  const http=async(url,options)=>{
+    calls.push({url,options});assert.equal(options.redirect,'manual');
+    assert.ok(options.signal instanceof AbortSignal);
+    if(url==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic-google-token'});
+    if(url.endsWith('/values:batchUpdate'))return Response.json({totalUpdatedCells:1});
+    return Response.json({values:crmRows()});
+  };
+  const plan=await checkCrm(credentials,deliveredEvent,http,true);
+  assert.equal(plan.updates.length,1);
+  assert.deepEqual(await writePlannedCrmCells(credentials,plan.updates,http),{written_cells:1});
+  assert.equal(calls.length,4);assert.deepEqual(timeouts,[12000,12000,12000,12000]);
+  assert.equal(new Set(calls.map(call=>call.options.signal)).size,4);
+  assert.ok(calls.every(call=>['oauth2.googleapis.com','sheets.googleapis.com'].includes(new globalThis.URL(call.url).hostname)));
+});
+
+test('OAuth rejeita tokens não textuais, vazios, excessivos ou com espaços/controlos',async()=>{
+  const credentials=await syntheticGoogleCredentials();
+  for(const access_token of [undefined,null,{},[],true,7,'',' ','x\r\ny','x\u0085y','x'.repeat(4097)]){
+    await assert.rejects(googleToken(credentials,async()=>Response.json({access_token})),/google_auth_failed/);
+  }
+  assert.equal(await googleToken(credentials,async()=>Response.json({access_token:'synthetic.google-token_1~'})),
+    'synthetic.google-token_1~');
+});
+
+test('redirecionamentos de OAuth e Sheets falham sem enviar credenciais a outro destino',async()=>{
+  const credentials=await syntheticGoogleCredentials();
+  for(const operation of ['oauth','read','write']){
+    const calls=[];
+    const http=async(url,options)=>{
+      calls.push(url);assert.equal(options.redirect,'manual');
+      if(operation!=='oauth'&&url==='https://oauth2.googleapis.com/token')
+        return Response.json({access_token:'synthetic-google-token'});
+      return new Response(null,{status:302,headers:{location:'https://attacker.example.invalid/collect'}});
+    };
+    if(operation==='oauth')await assert.rejects(googleToken(credentials,http),/google_auth_failed/);
+    else if(operation==='read')await assert.rejects(checkCrm(credentials,deliveredEvent,http),/google_sheet_read_failed/);
+    else await assert.rejects(writePlannedCrmCells(credentials,[{range:"'Pedidos'!V2",values:[['Entregue']]}],http),/google_sheet_write_failed/);
+    assert.equal(calls.length,operation==='oauth'?1:2);
+    assert.ok(calls.every(url=>!url.includes('attacker')));
+  }
+});
+
+test('um email entregue ignora falha ou atraso antigos sem alterar prioridades Bounce/Spam',()=>{
+  const rows=crmRows('synthetic-message-id','Entregue');
+  for(const type of ['email.sent','email.delivery_delayed','email.failed']){
+    assert.deepEqual(planCrmEvent(rows,{type,data:{email_id:'synthetic-message-id'}}),
+      {matched:true,planned_cells:0,updates:[]});
+  }
+  for(const [type,next] of [['email.bounced','Bounce'],['email.complained','Spam']]){
+    const plan=planCrmEvent(rows,{type,data:{email_id:'synthetic-message-id'}});
+    assert.deepEqual(plan.updates,[{range:"'Pedidos'!V2",values:[[next]]},{range:"'Pedidos'!Y2",values:[['Sim']]}]);
+  }
+  for(const current of ['Bounce','Spam','Cancelou subscrição']){
+    assert.deepEqual(planCrmEvent(crmRows('synthetic-message-id',current),{type:'email.failed',data:{email_id:'synthetic-message-id'}}),
+      {matched:true,planned_cells:0,updates:[]});
+  }
+});
+
+test('eventos assinados repetem falhas do writer ativo e preservam erros e dry-run do proprietário',async t=>{
+  t.mock.method(Date,'now',()=>NOW);t.mock.method(console,'warn',()=>{});
+  for(const [event,flags,credentials,expected] of [
+    [deliveredEvent,{RESEND_CRM_GENERAL_WRITE_ENABLED:'true'},'invalid-json',503],
+    [fixtureEvent,{RESEND_WEBHOOK_WRITE_ENABLED:'true'},'invalid-json',503],
+    [fixtureEvent,{RESEND_WEBHOOK_WRITE_ENABLED:'true'},undefined,503],
+    [deliveredEvent,{RESEND_CRM_GENERAL_WRITE_ENABLED:'true'},undefined,503],
+    [deliveredEvent,{RESEND_WEBHOOK_WRITE_ENABLED:'true'},'invalid-json',200],
+    [{...fixtureEvent,type:'email.sent'},{RESEND_WEBHOOK_WRITE_ENABLED:'true'},'invalid-json',200],
+    [fixtureEvent,{},'invalid-json',200],
+    [deliveredEvent,{},undefined,200]
+  ]){
+    const coordinator=new CrmEventCoordinator({}, {...flags,GOOGLE_SERVICE_ACCOUNT_JSON:credentials});
+    const env={RESEND_WEBHOOK_SECRET:SECRET,CRM_COORDINATOR:{idFromName:()=> 'local-only',get:()=>coordinator}};
+    const result=await webhook.fetch(await requestFor(JSON.stringify(event)),env);
+    const body=await result.json();assert.equal(result.status,expected);
+    const intentionalDryRun=expected===200&&credentials===undefined;
+    assert.equal(body.accepted,intentionalDryRun);assert.equal(body.crm_writes_enabled,false);
+    assert.equal(body.mode,intentionalDryRun?'dry_run':'error');
+    if(expected===503)assert.equal(body.error,'crm_write_unavailable');
+  }
+});
+
+test('falhas de escrita ativa são repetíveis sem detalhes privados na resposta ou nos logs',async t=>{
+  const credentials=await syntheticGoogleCredentials(),warnings=[];
+  t.mock.method(console,'warn',(...args)=>warnings.push(args));
+  const calls=[];
+  t.mock.method(globalThis,'fetch',async(url,options)=>{
+    calls.push({url,options});
+    if(url==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic-google-token'});
+    if(url.endsWith('/values:batchUpdate'))throw Error('private-provider-and-credential-detail');
+    return Response.json({values:crmRows()});
+  });
+  const coordinator=new CrmEventCoordinator({}, {GOOGLE_SERVICE_ACCOUNT_JSON:credentials,RESEND_CRM_GENERAL_WRITE_ENABLED:'true'});
+  const result=await coordinator.fetch(coordinatorRequest(deliveredEvent));
+  assert.equal(result.status,503);
+  assert.deepEqual(await result.json(),{accepted:false,mode:'error',crm_writes_enabled:false,crm_check:'crm_check_failed',error:'crm_write_unavailable'});
+  assert.deepEqual(warnings,[['resend_crm_coordinator_check_failed','crm_check_failed']]);
+  assert.equal(calls.filter(call=>call.url.endsWith('/values:batchUpdate')).length,1);
+});
+
+test('a leitura bloqueada aborta e liberta a fila para o evento seguinte',async t=>{
+  const credentials=await syntheticGoogleCredentials(),controllers=[];
+  let reading,reads=0;
+  const started=new Promise(resolve=>{reading=resolve;});
+  t.mock.method(console,'warn',()=>{});
+  t.mock.method(AbortSignal,'timeout',milliseconds=>{
+    assert.equal(milliseconds,12000);const controller=new AbortController();controllers.push(controller);return controller.signal;
+  });
+  t.mock.method(globalThis,'fetch',async(url,options)=>{
+    if(url==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic-google-token'});
+    reads++;
+    if(reads===1)return new Promise((resolve,reject)=>{
+      options.signal.addEventListener('abort',()=>reject(options.signal.reason),{once:true});reading(options.signal);
+    });
+    return Response.json({values:[crmRows()[0]]});
+  });
+  const coordinator=new CrmEventCoordinator({}, {GOOGLE_SERVICE_ACCOUNT_JSON:credentials,RESEND_CRM_GENERAL_WRITE_ENABLED:'true'});
+  const first=coordinator.fetch(coordinatorRequest(deliveredEvent));
+  const blockedSignal=await started;
+  const next=coordinator.fetch(coordinatorRequest(deliveredEvent));
+  controllers.find(controller=>controller.signal===blockedSignal).abort(new DOMException('Synthetic timeout','TimeoutError'));
+  assert.equal((await first).status,503);
+  const recovered=await next;assert.equal(recovered.status,200);
+  assert.equal((await recovered.json()).matched,false);assert.equal(reads,2);
+});
+
+test('dry-run conserva diagnóstico do proprietário e nunca ativa a escrita preparada',async t=>{
+  const credentials=await syntheticGoogleCredentials(),calls=[];
+  t.mock.method(globalThis,'fetch',async(url,options)=>{
+    calls.push({url,options});
+    if(url==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic-google-token'});
+    if(url.endsWith('/values:batchUpdate'))throw Error('dry-run-must-not-write');
+    return Response.json({values:crmRows()});
+  });
+  const coordinator=new CrmEventCoordinator({}, {GOOGLE_SERVICE_ACCOUNT_JSON:credentials,RESEND_WEBHOOK_WRITE_ENABLED:'true'});
+  const result=await coordinator.fetch(coordinatorRequest(deliveredEvent));
+  assert.equal(result.status,200);
+  assert.deepEqual(await result.json(),{accepted:true,mode:'dry_run',crm_writes_enabled:false,crm_check:'ok',matched:true,planned_cells:1,
+    diagnostic:{write_flag_enabled:true,fixture_eligible:false,general_write_enabled:false}});
+  assert.equal(calls.length,2);assert.ok(calls.every(call=>!call.url.endsWith('/values:batchUpdate')));
+});
+
+test('o writer de fixture conserva o ID e V26 exatos e repete escritas incompletas',async t=>{
+  const credentials=await syntheticGoogleCredentials(),writes=[];
+  let rowNumber=26,complete=true;
+  t.mock.method(console,'warn',()=>{});
+  t.mock.method(globalThis,'fetch',async(url,options)=>{
+    if(url==='https://oauth2.googleapis.com/token')return Response.json({access_token:'synthetic-google-token'});
+    if(url.endsWith('/values:batchUpdate')){
+      writes.push(JSON.parse(options.body));return Response.json({totalUpdatedCells:complete?1:0});
+    }
+    const [header,row]=crmRows(fixtureEvent.data.email_id);
+    const rows=[header,...Array.from({length:rowNumber-1},()=>Array(26).fill(''))];rows[rowNumber-1]=row;
+    return Response.json({values:rows});
+  });
+  const coordinator=new CrmEventCoordinator({}, {GOOGLE_SERVICE_ACCOUNT_JSON:credentials,RESEND_WEBHOOK_WRITE_ENABLED:'true'});
+  const result=await coordinator.fetch(coordinatorRequest(fixtureEvent));
+  assert.equal(result.status,200);assert.equal((await result.json()).mode,'fixture_write');
+  assert.deepEqual(writes,[{valueInputOption:'RAW',data:[{range:"'Pedidos'!V26",values:[['Entregue']]}]}]);
+  rowNumber=25;
+  const wrongRow=await coordinator.fetch(coordinatorRequest(fixtureEvent));
+  assert.equal(wrongRow.status,200);assert.equal((await wrongRow.json()).mode,'dry_run');assert.equal(writes.length,1);
+  rowNumber=26;complete=false;
+  const incomplete=await coordinator.fetch(coordinatorRequest(fixtureEvent));
+  assert.equal(incomplete.status,503);
+  assert.deepEqual(await incomplete.json(),{accepted:false,mode:'error',crm_writes_enabled:false,
+    crm_check:'google_sheet_write_incomplete',error:'crm_write_unavailable'});
+});
+
+test('o modo read-only preserva a resposta 503 do proprietário perante falha transitória',async t=>{
+  const credentials=await syntheticGoogleCredentials();
+  t.mock.method(console,'warn',()=>{});
+  t.mock.method(globalThis,'fetch',async()=>Response.json({error:'synthetic-only'},{status:503}));
+  const coordinator=new CrmEventCoordinator({}, {GOOGLE_SERVICE_ACCOUNT_JSON:credentials});
+  const result=await coordinator.fetch(coordinatorRequest(deliveredEvent));
+  assert.equal(result.status,503);
+  assert.deepEqual(await result.json(),{accepted:false,mode:'error',crm_writes_enabled:false,crm_check:'google_auth_failed'});
 });

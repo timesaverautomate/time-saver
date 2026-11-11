@@ -1,5 +1,6 @@
-flask>=3.0,<4
-svix>=1.0,<2
-gunicorn>=22,<24
-google-auth>=2.0,<3
-requests>=2.31,<3
+# Webhook Python opcional: versões e hashes partilhados com os testes do CRM.
+# O servidor WSGI continua incluído, num bloqueio separado.
+--require-hashes
+--only-binary=:all:
+-r requirements-crm.txt
+-r requirements-server.txt

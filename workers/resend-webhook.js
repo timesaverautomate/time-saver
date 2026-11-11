@@ -129,6 +129,11 @@ export async function verifySvix(body, headers, secret, now = Date.now()) {
 
 const CRM_ID = "1VYEBWJb_9cYGbO8nZa3d_qh1rLUH-H3xf-w4CnOLMS4";
 function b64url(bytes) { let s = ""; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+function googleRequest(http, url, options = {}) {
+  // Credenciais nunca acompanham redirecionamentos; uma chamada bloqueada não
+  // pode prender indefinidamente os restantes eventos do coordenador.
+  return http(url, {...options, redirect:"manual", signal:AbortSignal.timeout(12000)});
+}
 export async function googleToken(json, http = fetch, scope = "https://www.googleapis.com/auth/spreadsheets.readonly") {
   let c;
   try { c = JSON.parse(json); } catch { throw Error("invalid_credentials"); }
@@ -139,10 +144,11 @@ export async function googleToken(json, http = fetch, scope = "https://www.googl
   const der = Uint8Array.from(atob(c.private_key.replace(/-----[^-]+-----|\s/g,"")), x=>x.charCodeAt(0));
   const key = await crypto.subtle.importKey("pkcs8",der,{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["sign"]);
   const signature = b64url(new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5",key,new TextEncoder().encode(unsigned))));
-  const r = await http("https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion:unsigned+"."+signature})});
+  const r = await googleRequest(http,"https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion:unsigned+"."+signature})});
   if (!r.ok) throw Error("google_auth_failed");
   const result = await r.json();
-  if (!result.access_token) throw Error("google_auth_failed");
+  if (typeof result?.access_token !== "string" || result.access_token.length < 1
+    || result.access_token.length > 4096 || /[^\x21-\x7e]/.test(result.access_token)) throw Error("google_auth_failed");
   return result.access_token;
 }
 export function planCrmEvent(rows,event) {
@@ -179,7 +185,7 @@ export async function writePlannedCrmCells(credentialsJson, updates, http = fetc
     throw Error("invalid_crm_updates");
   const token = await googleToken(credentialsJson, http, "https://www.googleapis.com/auth/spreadsheets");
   const url = "https://sheets.googleapis.com/v4/spreadsheets/"+CRM_ID+"/values:batchUpdate";
-  const r = await http(url, {method:"POST",headers:{
+  const r = await googleRequest(http,url, {method:"POST",headers:{
     authorization:"Bearer "+token,"content-type":"application/json"
   },body:JSON.stringify({valueInputOption:"RAW",data:updates})});
   if (!r.ok) throw Error("google_sheet_write_failed");
@@ -191,7 +197,7 @@ export async function writePlannedCrmCells(credentialsJson, updates, http = fetc
 export async function checkCrm(json,event,http=fetch,includeUpdates=false) {
   const token=await googleToken(json,http);
   const url="https://sheets.googleapis.com/v4/spreadsheets/"+CRM_ID+"/values/"+encodeURIComponent("'Pedidos'!A1:Z5000");
-  const r=await http(url,{headers:{authorization:"Bearer "+token}});
+  const r=await googleRequest(http,url,{headers:{authorization:"Bearer "+token}});
   if(!r.ok) throw Error("google_sheet_read_failed");
   const data=await r.json();
   if(!Array.isArray(data.values)||data.values[0]?.[22]!=="ID mensagem Resend") throw Error("crm_schema_mismatch");
@@ -220,15 +226,21 @@ export class CrmEventCoordinator {
       try { event=await request.json(); } catch { return response({error:"invalid_json"},400); }
       if (!types.has(event?.type) || typeof event?.data?.email_id !== "string")
         return response({error:"invalid_crm_event"},400);
-      if (!this.env?.GOOGLE_SERVICE_ACCOUNT_JSON)
+      const fixtureEvent=event.type==="email.delivered" &&
+        event.data.email_id==="01a1ca94-4663-7eee-93bc-6fd01eccf4f4";
+      const writeRequested=this.env?.RESEND_CRM_GENERAL_WRITE_ENABLED==="true" ||
+        this.env?.RESEND_WEBHOOK_WRITE_ENABLED==="true" && fixtureEvent;
+      const retryWrite=reason=>response({accepted:false,mode:"error",crm_writes_enabled:false,
+        crm_check:reason,error:"crm_write_unavailable"},503);
+      if (!this.env?.GOOGLE_SERVICE_ACCOUNT_JSON) {
+        if(writeRequested)return retryWrite("credentials_missing");
         return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:"credentials_missing"});
+      }
       try {
         const plan=await checkCrm(this.env.GOOGLE_SERVICE_ACCOUNT_JSON,event,fetch,true);
         // Single-fixture write gate. Production remains read-only by default.
         // No other message ID, event, row, or column may ever be written by this release.
-        const fixture=event.type==="email.delivered" &&
-          event.data.email_id==="01a1ca94-4663-7eee-93bc-6fd01eccf4f4" &&
-          plan.matched && plan.updates.length===1 &&
+        const fixture=fixtureEvent && plan.matched && plan.updates.length===1 &&
           plan.updates[0].range==="'Pedidos'!V26" &&
           plan.updates[0].values?.[0]?.[0]==="Entregue";
         if(this.env.RESEND_WEBHOOK_WRITE_ENABLED==="true" && fixture) {
@@ -249,6 +261,7 @@ export class CrmEventCoordinator {
         const safe=new Set(["invalid_credentials","google_auth_failed","google_sheet_read_failed","crm_schema_mismatch","duplicate_message_id","google_sheet_write_failed","google_sheet_write_incomplete"]);
         const reason=safe.has(error?.message)?error.message:"crm_check_failed";
         console.warn("resend_crm_coordinator_check_failed",reason);
+        if(writeRequested)return retryWrite(reason);
         return response({accepted:false,mode:"error",crm_writes_enabled:false,crm_check:reason},
           ["google_auth_failed","google_sheet_read_failed","google_sheet_write_failed","google_sheet_write_incomplete","crm_check_failed"].includes(reason)?503:200);
       }

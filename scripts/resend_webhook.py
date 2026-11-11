@@ -27,9 +27,18 @@ def verified_payload(body, headers, secret):
     if not all(svix_headers.values()):
         raise PermissionError("Assinatura em falta")
     try:
-        return Webhook(secret).verify(body, svix_headers)
+        # SDK 1 devolvia JSON; SDK 2 apenas confirma a assinatura. A autenticação
+        # tem de terminar antes de interpretar o corpo em qualquer das versões.
+        Webhook(secret).verify(body, svix_headers)
     except Exception as exc:
         raise PermissionError("Assinatura inválida") from exc
+    try:
+        payload = json.loads(body)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("JSON do evento inválido") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("O evento tem de ser um objeto JSON")
+    return payload
 
 
 def google_session():
@@ -63,7 +72,12 @@ def resend_webhook():
             os.environ.get("RESEND_WEBHOOK_SECRET", ""))
     except (PermissionError, RuntimeError):
         abort(401)
-    if payload.get("type") not in {
+    except ValueError:
+        abort(400)
+    kind = payload.get("type")
+    if not isinstance(kind, str):
+        abort(400)
+    if kind not in {
         "email.sent", "email.delivered", "email.bounced",
         "email.complained", "email.delivery_delayed", "email.failed",
     }:
