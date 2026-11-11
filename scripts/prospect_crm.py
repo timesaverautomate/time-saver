@@ -835,6 +835,14 @@ def find_candidates(existing, limit, day=None):
         print(f"Zona {city}: {len(group)} candidatos novos para triagem.", flush=True)
         time.sleep(1)
     candidates = prioritized_candidates(groups, limit)
+    size_summary = {str(level): sum(size_priority(row) == level for row in candidates)
+                    for level in (0, 1, 2, 3)}
+    zone_summary = {str(level): sum(geography_priority(row) == level for row in candidates)
+                    for level in (0, 1, 2)}
+    cae_summary = {str(level): sum(cae_priority(row) == level for row in candidates)
+                   for level in (0, 1, 2)}
+    print(f"Prioridade candidatos: dimensão={size_summary}; zona={zone_summary}; "
+          f"CAE/setor={cae_summary}", flush=True)
     print(f"Consultas com sucesso: {successful}; falhas: {failed}", flush=True)
     print(f"Candidatos encontrados (diversidade geográfica): {len(candidates)}", flush=True)
     if successful == 0:
