@@ -188,7 +188,7 @@ export async function writePlannedCrmCells(credentialsJson, updates, http = fetc
   return {written_cells:result.totalUpdatedCells};
 }
 
-export async function checkCrm(json,event,http=fetch) {
+export async function checkCrm(json,event,http=fetch,includeUpdates=false) {
   const token=await googleToken(json,http);
   const url="https://sheets.googleapis.com/v4/spreadsheets/"+CRM_ID+"/values/"+encodeURIComponent("'Pedidos'!A1:Z5000");
   const r=await http(url,{headers:{authorization:"Bearer "+token}});
@@ -196,7 +196,7 @@ export async function checkCrm(json,event,http=fetch) {
   const data=await r.json();
   if(!Array.isArray(data.values)||data.values[0]?.[22]!=="ID mensagem Resend") throw Error("crm_schema_mismatch");
   const {updates, ...summary}=planCrmEvent(data.values,event);
-  return summary;
+  return includeUpdates ? {...summary,updates} : summary;
 }
 
 
@@ -223,10 +223,23 @@ export class CrmEventCoordinator {
       if (!this.env?.GOOGLE_SERVICE_ACCOUNT_JSON)
         return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:"credentials_missing"});
       try {
-        const plan=await checkCrm(this.env.GOOGLE_SERVICE_ACCOUNT_JSON,event);
-        return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:"ok",...plan});
+        const plan=await checkCrm(this.env.GOOGLE_SERVICE_ACCOUNT_JSON,event,fetch,true);
+        // Single-fixture write gate. Production remains read-only by default.
+        // No other message ID, event, row, or column may ever be written by this release.
+        const fixture=event.type==="email.delivered" &&
+          event.data.email_id==="01a1ca54-de27-7648-bf79-32182001f650" &&
+          plan.matched && plan.updates.length===1 &&
+          plan.updates[0].range==="'Pedidos'!V25" &&
+          plan.updates[0].values?.[0]?.[0]==="Entregue";
+        if(this.env.RESEND_WEBHOOK_WRITE_ENABLED==="true" && fixture) {
+          const result=await writePlannedCrmCells(this.env.GOOGLE_SERVICE_ACCOUNT_JSON,plan.updates);
+          return response({accepted:true,mode:"fixture_write",crm_writes_enabled:true,
+            crm_check:"ok",matched:true,planned_cells:1,...result});
+        }
+        const {updates,...summary}=plan;
+        return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:"ok",...summary});
       } catch(error) {
-        const safe=new Set(["invalid_credentials","google_auth_failed","google_sheet_read_failed","crm_schema_mismatch","duplicate_message_id"]);
+        const safe=new Set(["invalid_credentials","google_auth_failed","google_sheet_read_failed","crm_schema_mismatch","duplicate_message_id","google_sheet_write_failed","google_sheet_write_incomplete"]);
         const reason=safe.has(error?.message)?error.message:"crm_check_failed";
         console.warn("resend_crm_coordinator_check_failed",reason);
         return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:reason});
