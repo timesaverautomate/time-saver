@@ -249,35 +249,26 @@ def prospect_score(row):
 
 
 def proposal_content(row):
-    """Proposta setorial baseada apenas em hipóteses, sem alegar pesquisa individual."""
-    sector = norm(row[1] if len(row) > 1 else "")
-    name = str(row[0]).strip()[:80] if row else "a vossa empresa"
-    if "contab" in sector or "accountant" in sector:
-        subject = "Menos tempo em tarefas de contabilidade"
-        opportunity = "reconciliações, tratamento de documentos e relatórios"
-    elif "estate_agent" in sector or "imobili" in sector:
-        subject = "Automatização de processos imobiliários"
-        opportunity = "registo de contactos, acompanhamento de clientes e documentação"
-    elif "insurance" in sector or "segur" in sector:
-        subject = "Menos trabalho administrativo na mediação"
-        opportunity = "tratamento de pedidos, documentação e acompanhamento de clientes"
-    elif "computer" in sector or "electronics" in sector or "mobile_phone" in sector:
-        subject = "Menos tarefas repetitivas na gestão da loja"
-        opportunity = "pedidos, atualizações de stock e relatórios de vendas"
-    elif "consult" in sector:
-        subject = "Automatizar tarefas na gestão de projetos"
-        opportunity = "relatórios, organização de documentos e acompanhamento de tarefas"
-    else:
-        subject = "Uma ideia para poupar tempo na sua empresa"
-        opportunity = "atualização de ficheiros, gestão de pedidos e relatórios"
+    """Email comercial base aprovado, com exemplos concretos e sem envio."""
+    name = str(row[0]).strip()[:80] if row else ""
+    subject = "TimeSaver | Poupe tempo e reduza custos com automação"
+    greeting = "Bom dia," if not name else f"Bom dia, equipa {name},"
     body = (
-        f"Bom dia, equipa {name},\\n\\n"
-        "Somos a TimeSaver e ajudamos empresas a automatizar processos repetitivos.\\n\\n"
-        f"No vosso setor, pode fazer sentido simplificar {opportunity}. "
-        "Não sabemos se estes processos representam um desafio na vossa empresa, "
-        "mas gostaríamos de perceber se existe alguma oportunidade de melhoria.\\n\\n"
-        "Faria sentido uma conversa breve, sem compromisso?\\n\\n"
-        "Cumprimentos,\\nEquipa TimeSaver"
+        greeting + "\n\n"
+        "Somos a TimeSaver, uma empresa especializada na automatização de processos empresariais.\n\n"
+        "Ajudamos empresas a reduzir o tempo gasto em tarefas repetitivas, como:\n\n"
+        "- Receção, organização e tratamento automático de faturas;\n"
+        "- Organização e gestão de emails através de regras e automatizações;\n"
+        "- Reconciliações e atualização automática de ficheiros Excel;\n"
+        "- Elaboração de relatórios e tratamento de documentos;\n"
+        "- Entre outros processos administrativos.\n\n"
+        "O nosso objetivo é simples: poupar tempo, reduzir custos e libertar a equipa "
+        "para tarefas de maior valor.\n\n"
+        "Gostaríamos de perceber se existem processos na vossa empresa que possam "
+        "ser simplificados ou automatizados.\n\n"
+        "Teriam disponibilidade para uma breve reunião, sem compromisso, "
+        "para explorarmos possíveis oportunidades?\n\n"
+        "Cumprimentos,\nEquipa TimeSaver"
     )
     return subject, body
 
