@@ -192,9 +192,19 @@ test('CRM read-only planning matches message IDs and refuses duplicates', () => 
   const header = Array(26).fill(''); header[22] = 'ID mensagem Resend';
   const row = Array(26).fill(''); row[22] = 'test-id'; row[21] = 'Enviado'; row[24] = 'Não';
   const event = { type: 'email.bounced', data: { email_id: 'test-id' } };
-  assert.deepEqual(planCrmEvent([header,row],event),{matched:true,planned_cells:2});
-  assert.deepEqual(planCrmEvent([header,row],{type:'email.delivered',data:{email_id:'other'}}),{matched:false,planned_cells:0});
+  assert.deepEqual(planCrmEvent([header,row],event),{matched:true,planned_cells:2,updates:[{range:"'Pedidos'!V2",values:[['Bounce']]},{range:"'Pedidos'!Y2",values:[['Sim']]}]});
+  assert.deepEqual(planCrmEvent([header,row],{type:'email.delivered',data:{email_id:'other'}}),{matched:false,planned_cells:0,updates:[]});
   assert.throws(()=>planCrmEvent([header,row,row],event),/duplicate_message_id/);
   const blocked = [...row]; blocked[21]='Bounce'; blocked[24]='Sim';
-  assert.deepEqual(planCrmEvent([header,blocked],{type:'email.delivered',data:{email_id:'test-id'}}),{matched:true,planned_cells:0});
+  assert.deepEqual(planCrmEvent([header,blocked],{type:'email.delivered',data:{email_id:'test-id'}}),{matched:true,planned_cells:0,updates:[]});
+});
+
+test('CRM rejects late sent events after delivery and only plans narrow cells', () => {
+ const header=Array(26).fill(''); header[22]='ID mensagem Resend';
+ const row=Array(26).fill(''); row[22]='id-1'; row[21]='Entregue';
+ assert.deepEqual(planCrmEvent([header,row],{type:'email.sent',data:{email_id:'id-1'}}),
+   {matched:true,planned_cells:0,updates:[]});
+ const delayed={...row}; delayed[21]='Entrega atrasada';
+ assert.deepEqual(planCrmEvent([header,delayed],{type:'email.delivered',data:{email_id:'id-1'}}).updates,
+   [{range:"'Pedidos'!V2",values:[['Entregue']]}]);
 });
