@@ -47,7 +47,8 @@ class ProspectCrmTests(unittest.TestCase):
         row = crm.review_row(crm.candidate(sample(), "Porto"), 25)
         self.assertEqual(len(row), 12)
         self.assertEqual(row[8], "Por verificar")
-        self.assertEqual(row[9:11], ["", ""])
+        self.assertEqual(row[9], "")
+        self.assertIn("RASCUNHO NÃO ENVIADO", row[10])
         self.assertEqual(row[11], "25")
 
     def test_review_sync_preserves_existing_decisions(self):
