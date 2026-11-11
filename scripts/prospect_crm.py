@@ -662,13 +662,19 @@ def find_candidates(existing, limit, day=None):
         f"{name} ({kind})" for name, _, _, _, kind in plan
     ), flush=True)
     for city, lat, lon, radius, kind in plan:
+        # Filtrar apenas estabelecimentos com email já documentado no OSM.
+        # Evita consumir o limite de resultados com POI sem contacto e mantém
+        # a exclusão de caixas pessoais em candidate().
+        area = f"around:{radius},{lat},{lon}"
+        offices = "^(accountant|estate_agent|consulting|insurance|company|logistics)$"
+        shops = "^(wholesale|trade|office_supplies|computer|hardware|electronics|pet)$"
         query = (
-            '[out:json][timeout:35];('
-            f'nwr(around:{radius},{lat},{lon})'
-            '["office"~"^(accountant|estate_agent|consulting|insurance|company|logistics)$"]["name"];'
-            f'nwr(around:{radius},{lat},{lon})'
-            '["shop"~"^(wholesale|trade|office_supplies|computer|hardware|electronics|pet)$"]["name"];'
-            ');out tags 250;'
+            "[out:json][timeout:35];("
+            f'nwr({area})["office"~"{offices}"]["name"]["contact:email"];'
+            f'nwr({area})["office"~"{offices}"]["name"]["email"];'
+            f'nwr({area})["shop"~"{shops}"]["name"]["contact:email"];'
+            f'nwr({area})["shop"~"{shops}"]["name"]["email"];'
+            ");out tags 250;"
         )
         elements = None
         for endpoint in ENDPOINTS:
