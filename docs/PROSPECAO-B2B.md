@@ -31,3 +31,20 @@ O workflow `.github/workflows/prospect-crm.yml` corre testes num push a `main` e
 
 ## Métricas a validar
 Registar por zona/setor: candidatos descobertos, novos após deduplicação, sites e emails confirmados, elegíveis legalmente, emails efetivamente enviados, respostas, reuniões e vendas. Não há taxa de resposta garantida.
+
+## Circuito comercial completo — dois canais separados
+
+1. **Descoberta OSM**: 8 zonas rotativas, preferência por subúrbios e empresas de menor dimensão. Pesquisa apenas pontos com email registado, sem presumir que a empresa é micro ou pequena.
+2. **Qualificação**: excluir duplicados por email, domínio, identidade e OSM; atribuir score comercial apenas com factos observáveis; limite de 15 registos por dia e máximo de 5 por zona.
+3. **Revisão Comercial**: novos contactos entram bloqueados em `Pedidos` e na lista de revisão. Verificar sociedade, email, domínio, atividade, indícios de dimensão, fonte e data; preencher campos M:S da aba de revisão; nunca gerar autorizações automaticamente.
+4. **Canal de prospeção inicial**: pesquisa e preparação de rascunhos para avaliação. Contactos sem consentimento comprovado **não podem ser enviados pelo Resend**, mesmo que certas comunicações a sociedades sejam permitidas na legislação portuguesa. Não usar a infraestrutura Resend para cold outreach.
+5. **Canal Resend opt-in**: apenas para destinatários com consentimento documentado e aprovação humana. `outreach-legal.yml` seleciona, limita a 5 envios por dia útil, reserva antes do envio, usa idempotência, grava identificador de mensagem e datas de contacto no CRM. Não faz follow-ups automáticos.
+6. **Acompanhamento**: reconciliação automática do estado no Resend e bloqueio em caso de bounce/spam/supressão; qualquer resposta de oposição recebida por email deve ser registada manualmente no CRM no próprio dia, até haver integração de entrada autorizada e testada.
+
+## Testes e operações
+
+- Push a `main`: executa validação e testes sem credenciais de envio.
+- Commit de teste com marcador `[smoke-crm]`: depois dos testes, faz uma consulta real do CRM e OSM **apenas em modo simulação**, sem escritas e sem envios. Consultas OSM podem falhar por indisponibilidade/rate limiting; o erro deve ser visível no GitHub Actions.
+- Agenda diária `prospect-crm.yml`: recolha de novos candidatos bloqueados e sincronização da revisão; horário 08:15 UTC.
+- Agenda de dias úteis `outreach-legal.yml`: verifica consentimentos documentados e, apenas nesse caso, envia até 5 mensagens autorizadas. Também reconcilia entregas. **Se não houver autorização documentada, 0 envios é o comportamento correto.**
+- O Resend proíbe mensagens não solicitadas e dados recolhidos por scraping, conforme a política em https://resend.com/legal/acceptable-use (atualização 13/10/2026). Conformidade legal e aprovação contratual do fornecedor são verificações distintas.
