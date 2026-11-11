@@ -1,5 +1,5 @@
 name: TimeSaver - teste interno Resend CRM
-on:
+'on':
   workflow_dispatch:
     inputs:
       confirm:
@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   test:
-    if: github.repository == 'timesaverautomate/time-saver' && github.ref == 'refs/heads/main' && inputs.confirm == 'TESTAR'
+    if: ${{ github.repository == 'timesaverautomate/time-saver' && github.ref == 'refs/heads/main' && inputs.confirm == 'TESTAR' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
