@@ -102,6 +102,16 @@ class ProspectCrmTests(unittest.TestCase):
         self.assertIn("RASCUNHO NÃO ENVIADO", crm.draft_proposal(accounting))
         self.assertEqual(accounting[24], "Sim")
 
+    def test_resend_preview_is_only_data(self):
+        row = crm.candidate(sample(), "Porto")
+        row[1] = "accountant"
+        preview = crm.build_resend_preview(row)
+        self.assertEqual(preview["to"], "geral@alfa.pt")
+        self.assertIn("contabilidade", preview["subject"])
+        self.assertIn("reconciliações", preview["text"])
+        self.assertEqual(preview["status"], "SIMULADO — NÃO ENVIADO")
+        self.assertEqual(row[24], "Sim")
+
     def test_send_gate_fails_closed(self):
         row = crm.candidate(sample(), "Porto")
         review = crm.review_row(row, 2)
