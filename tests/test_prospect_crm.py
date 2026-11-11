@@ -337,5 +337,25 @@ class ProspectCrmTests(unittest.TestCase):
         self.assertEqual(crm.MAX_PER_ZONE, 5)
 
 
+    def test_overpass_query_uses_indexed_bbox_and_email_filters(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        element = sample(name="Pequena Empresa Teste", email="geral@alfa.pt", osm_id=444)
+        data = SimpleNamespace(status_code=200, json=lambda: {"elements": [element]})
+        with patch.object(crm.requests, "get", return_value=data) as get, \
+             patch.object(crm.time, "sleep", return_value=None):
+            rows = crm.find_candidates([], 3, day="2026-11-11")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(get.call_args_list), 8)
+        first = get.call_args_list[0]
+        self.assertEqual(first.args[0], crm.ENDPOINTS[0])
+        query = first.kwargs["params"]["data"]
+        self.assertIn('["contact:email"]', query)
+        self.assertIn('["email"]', query)
+        self.assertNotIn("around:", query)
+        self.assertIn("nwr(", query)
+        self.assertEqual(rows[0][24], "Sim")
+
+
 if __name__ == "__main__":
     unittest.main()
