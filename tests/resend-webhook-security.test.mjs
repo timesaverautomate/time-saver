@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import webhook, { verifySvix, verifySvixDetailed, readWebhookBody, WebhookBodyError } from '../workers/resend-webhook.js';
+import webhook, { verifySvix, verifySvixDetailed, readWebhookBody, WebhookBodyError, planCrmEvent } from '../workers/resend-webhook.js';
 
 const NOW = 1794384000000;
 const SECRET = 'whsec_' + btoa('synthetic-webhook-key-for-tests!!');
@@ -170,7 +170,7 @@ test('assinatura válida mantém dry-run e ignora tipos desconhecidos sem rede o
   const event = JSON.stringify({ type: 'email.delivered', data: { email_id: 'synthetic-message-id' } });
   const response = await webhook.fetch(await requestFor(event), env);
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { accepted: true, mode: 'dry_run', crm_writes_enabled: false });
+  assert.deepEqual(await response.json(), { accepted: true, mode: 'dry_run', crm_writes_enabled: false, crm_check: 'credentials_missing' });
   const ignored = await webhook.fetch(await requestFor(JSON.stringify({ type: 'unknown.type' })), env);
   assert.deepEqual(await ignored.json(), { accepted: true, ignored: true });
   for (const id of ['', 'x'.repeat(201), 'line\nbreak']) {
@@ -186,4 +186,15 @@ test('64 KiB exatos são permitidos; rotas e health mantêm o contrato sem guard
   assert.equal(health.status, 200); assert.deepEqual(await health.json(), { status: 'ok', sending_enabled: false, crm_writes_enabled: false });
   assert.equal(health.headers.get('cache-control'), 'no-store');
   assert.equal((await webhook.fetch(new Request(URL), {})).status, 404);
+});
+
+test('CRM read-only planning matches message IDs and refuses duplicates', () => {
+  const header = Array(26).fill(''); header[22] = 'ID mensagem Resend';
+  const row = Array(26).fill(''); row[22] = 'test-id'; row[21] = 'Enviado'; row[24] = 'Não';
+  const event = { type: 'email.bounced', data: { email_id: 'test-id' } };
+  assert.deepEqual(planCrmEvent([header,row],event),{matched:true,planned_cells:2});
+  assert.deepEqual(planCrmEvent([header,row],{type:'email.delivered',data:{email_id:'other'}}),{matched:false,planned_cells:0});
+  assert.throws(()=>planCrmEvent([header,row,row],event),/duplicate_message_id/);
+  const blocked = [...row]; blocked[21]='Bounce'; blocked[24]='Sim';
+  assert.deepEqual(planCrmEvent([header,blocked],{type:'email.delivered',data:{email_id:'test-id'}}),{matched:true,planned_cells:0});
 });
