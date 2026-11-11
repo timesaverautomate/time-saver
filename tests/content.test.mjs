@@ -10,6 +10,7 @@ test('conteúdo público: português, navegação interna e recursos locais exis
   for(const match of html.matchAll(/href="#([^"]+)"/g))assert.ok(ids.has(match[1]),'Âncora inválida: '+match[1]);
   for(const match of html.matchAll(/(?:src|href)="\/([^"#]+)"/g)) {
     if(['privacidade','cookies','aviso-legal'].includes(match[1])) continue;
+    if(match[1]==='en/'){assert.ok(readdirSync(publicDir).includes('en.html'));continue;}
     assert.ok(readdirSync(publicDir).includes(match[1]),'Recurso em falta: '+match[1]);
   }
   assert.match(html,/EXEMPLO ILUSTRATIVO/);
@@ -20,12 +21,14 @@ test('formulário acessível, sem armazenamento persistente nem submissão mailt
     assert.ok(html.includes('for="'+input[1]+'"'),'Etiqueta em falta: '+input[1]);
   }
   const js=readFileSync(new URL('app.js',publicDir),'utf8');
-  assert.equal(/localStorage|sessionStorage|indexedDB|document\.cookie|mailto:/.test(js+html),false);
+  assert.equal(/localStorage|sessionStorage|indexedDB|document\.cookie/.test(js+html),false);
   assert.match(html,/aria-live="polite"/);assert.match(html,/aria-describedby="description-help/);
   assert.match(html,/<button[^>]*type="submit" disabled/);
   assert.match(html,/<form[^>]*id="quote-form"[^>]*method="post"/);
   assert.match(js,/if \(busy \|\| sent\) return/);
   assert.match(js,/payload\.accepted === true/);
+  assert.doesNotMatch(js,/mailto:/);
+  assert.doesNotMatch(html,/<form\b[^>]*action=[\"']mailto:/i);
 });
 test('movimento reduzido, foco visível e layouts responsivos estão implementados',()=>{
   const css=readFileSync(new URL('styles.css',publicDir),'utf8');

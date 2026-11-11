@@ -81,6 +81,7 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
       const form=new FormData();
       const bindings=[{type:'plain_text',name:'TIME_SAVER_REPOSITORY_ID',text:PROJECT},
         {type:'plain_text',name:'HSTS_ENABLED',text:String(hsts)},
+        {type:'plain_text',name:'SEARCH_INDEXING_ENABLED',text:String(env.SEARCH_INDEXING_ENABLED==='true')},
         {type:'plain_text',name:'FORM_ENABLED',text:String(formRequested)},
         {type:'plain_text',name:'QUOTE_CRM_ENABLED',text:String(sheetRequested)}];
       if(formRequested){
@@ -127,6 +128,7 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
         const root=await fetcher('https://'+DOMAIN+'/',{redirect:'manual',signal:AbortSignal.timeout(15_000)});
         const body=await root.text();
         if(root.status!==200 || !secure(root)
+          || root.headers.get('X-Robots-Tag')!==(env.SEARCH_INDEXING_ENABLED==='true'?'index, follow':'noindex, nofollow')
           || (!formRequested&&/<(?:form|input|textarea|select)\b/i.test(body)) || body.includes('="/time-saver/'))return false;
         if(formRequested){
           const status=await fetcher('https://'+DOMAIN+'/api/form-status',{redirect:'manual',headers:{Origin:'https://'+DOMAIN},signal:AbortSignal.timeout(15_000)});

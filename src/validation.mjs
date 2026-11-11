@@ -20,7 +20,7 @@ export function validateSubmission(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { errors: { form: 'Pedido inválido.' }, data };
   const allowed = new Set(['name','email','description','company','service','tools','deadline','budget','website','token','goal','frequency','startingPoint','specifics']);
   if (Object.keys(input).some(key => !allowed.has(key))) errors.form = 'O pedido contém campos não permitidos.';
-  const fields = { name: [2, 100], email: [3, 254], description: [30, 4000], company: [0, 160], tools: [0, 500], specifics:[0,500], website: [0, 200], token: [0, 600] };
+  const fields = { name: [2, 100], email: [3, 254], description: [10, 4000], company: [0, 160], tools: [0, 500], specifics:[0,500], website: [0, 200], token: [0, 600] };
   for (const [field, [min,max]] of Object.entries(fields)) {
     const raw = input[field] ?? '';
     if (typeof raw !== 'string') { errors[field] = 'Utilize texto neste campo.'; continue; }

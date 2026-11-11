@@ -11,12 +11,15 @@ on:
       - 'src/validation.mjs'
       - 'src/security.mjs'
       - 'config/domain.json'
+      - 'config/site.json'
       - 'scripts/audit-repository-secrets.py'
       - 'scripts/deploy-site-domain.mjs'
       - 'scripts/run-site-domain.mjs'
       - 'scripts/verify-quote-sheet.mjs'
+      - 'scripts/check-quote-health.mjs'
       - 'scripts/zone-security.mjs'
       - 'scripts/probe-public-tls.mjs'
+      - 'scripts/site-settings.mjs'
 permissions: {}
 concurrency:
   group: time-saver-site-domain
@@ -56,3 +59,7 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: node scripts/run-site-domain.mjs
+      - name: Verificar diagnóstico autenticado sem gravar pedidos
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: node scripts/check-quote-health.mjs

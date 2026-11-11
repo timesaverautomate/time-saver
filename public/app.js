@@ -1,14 +1,23 @@
 'use strict';
+const isEN = document.documentElement.lang.startsWith('en');
+const locale = isEN ? 'en-GB' : 'pt-PT';
+const translate = (pt,en) => isEN ? en : pt;
 const menuButton = document.querySelector('.menu-toggle');
 const navigation = document.querySelector('#navegacao');
+function setMenuLabel(open) {
+  const label=menuButton?.querySelector('.sr-only');
+  if(label)label.textContent=open ? translate('Fechar menu','Close menu') : translate('Abrir menu','Open menu');
+}
 function closeMenu() {
   menuButton?.setAttribute('aria-expanded','false');
   navigation?.classList.remove('is-open');
+  setMenuLabel(false);
 }
 menuButton?.addEventListener('click', () => {
   const open = menuButton.getAttribute('aria-expanded') !== 'true';
   menuButton.setAttribute('aria-expanded',String(open));
-  navigation.classList.toggle('is-open',open);
+  navigation?.classList.toggle('is-open',open);
+  setMenuLabel(open);
 });
 navigation?.querySelectorAll('a').forEach(a=>a.addEventListener('click',closeMenu));
 document.addEventListener('keydown',event=>{
@@ -22,41 +31,63 @@ document.addEventListener('click',event=>{
 const currentYear = document.querySelector('#current-year');
 if (currentYear) currentYear.textContent = String(new Date().getFullYear());
 
-const flows = {
-  relatorios:['Vários ficheiros Excel','Informação espalhada, trabalho repetido.','Ligar. Organizar. Automatizar.','Um relatório organizado','Dados reunidos. Informação pronta a consultar.','Exemplo: reunir vários ficheiros Excel num relatório organizado.'],
-  integracoes:['Informação em várias ferramentas','O mesmo dado introduzido mais do que uma vez.','Validar. Ligar. Sincronizar.','Ferramentas em sintonia','Uma ligação definida entre ferramentas compatíveis.','Exemplo: integrar ferramentas compatíveis para reduzir a introdução repetida de dados.'],
-  pedidos:['Pedidos recebidos pela equipa','Tarefas e estados em locais diferentes.','Reunir. Organizar. Acompanhar.','Um processo acompanhado','Pedidos organizados, com um estado definido.','Exemplo: organizar pedidos internos numa aplicação à medida.']
-};
-const flowButtons = Array.from(document.querySelectorAll('[data-flow]'));
-function selectFlow(button,focus=false) {
-  const values = flows[button.dataset.flow];
-  if (!values) return;
-  flowButtons.forEach(tab=>{
-    const selected = tab === button;
-    tab.setAttribute('aria-selected',String(selected));
-    tab.tabIndex = selected ? 0 : -1;
-  });
-  ['flow-source','flow-source-note','flow-action','flow-result','flow-result-note','flow-caption'].forEach((id,index)=>{
-    document.getElementById(id).textContent = values[index];
-  });
-  document.querySelector('#flow-caption').setAttribute('aria-labelledby',button.id);
-  if (focus) button.focus();
-}
-flowButtons.forEach((button,index)=>{
-  button.addEventListener('click',()=>selectFlow(button));
-  button.addEventListener('keydown',event=>{
-    let next = index;
-    if (event.key === 'ArrowRight') next = (index+1)%flowButtons.length;
-    else if (event.key === 'ArrowLeft') next = (index+flowButtons.length-1)%flowButtons.length;
-    else if (event.key === 'Home') next = 0;
-    else if (event.key === 'End') next = flowButtons.length-1;
-    else return;
-    event.preventDefault(); selectFlow(flowButtons[next],true);
-  });
-});
-
 const form = document.querySelector('#quote-form');
 if (form) {
+  const copy={
+    unavailable:translate('O formulário está temporariamente indisponível.','The form is temporarily unavailable.'),
+    hostingDisabled:translate('O formulário ainda não está disponível. O envio de pedidos está temporariamente desativado.','The form is not available yet. Request submission is temporarily disabled.'),
+    checking:translate('A verificar a disponibilidade do formulário…','Checking form availability…'),
+    checkFailed:translate('Não foi possível verificar o serviço. Os campos foram mantidos; volte a verificar quando a ligação estiver disponível.',"We couldn't check the service. Your entries have been kept; check again when your connection is available."),
+    checkRestored:translate('O serviço está novamente disponível e os campos foram mantidos. Verifique os dados e carregue em Enviar pedido de orçamento. O envio não foi repetido automaticamente.','The service is available again and your entries have been kept. Check your details and select Send quote request. Your request has not been resubmitted automatically.'),
+    needsAttention:translate('Há campos que precisam da sua atenção. Os dados que preencheu foram mantidos.','Some fields need your attention. Your entries have been kept.'),
+    notSent:translate('O formulário ainda não está disponível. O pedido não foi enviado.','The form is not available yet. Your request has not been sent.'),
+    sending:translate('A enviar o pedido…','Sending your request…'),
+    received:translate('Recebemos o seu pedido. Respondemos em 24–48h úteis.',"We've received your request. We'll reply within 24–48 business hours."),
+    reference:translate('Referência: ','Reference: '),
+    emailAcceptance:translate('Esta confirmação indica aceitação pelo serviço de email; não confirma a entrega na caixa de entrada.','This confirms acceptance by the email service; it does not confirm delivery to the inbox.'),
+    accepted:translate('Pedido aceite para envio','Request accepted for sending'),
+    sendFailed:translate('Não foi possível confirmar o envio. Os dados foram mantidos; tente novamente.',"We couldn't confirm submission. Your entries have been kept; please try again."),
+    connectionFailed:translate('Não foi possível confirmar o envio. Os dados foram mantidos. Verifique a ligação e tente novamente com os mesmos dados para evitar duplicados.',"We couldn't confirm submission. Your entries have been kept. Check your connection and try again with the same details to avoid duplicates."),
+    renewed:translate('A sessão foi renovada e os campos foram mantidos. Verifique os dados e volte a carregar em Enviar pedido de orçamento. O envio não foi repetido automaticamente.','Your session has been renewed and your entries have been kept. Check your details and select Send quote request again. Your request has not been resubmitted automatically.'),
+    fieldFallback:translate('Verifique este campo e tente novamente.','Please check this field and try again.'),
+    emailInvalid:translate('Indique um email válido, por exemplo nome@empresa.pt.','Enter a valid email address, for example name@company.com.')
+  };
+  const serverMessages = new Map([
+    ['Página não encontrada.','Page not found.'],
+    ['Método não permitido.','This request method is not allowed.'],
+    ['Não foi possível validar a origem do pedido.',"We couldn't verify the origin of your request."],
+    ['O envio está temporariamente indisponível. Tente novamente mais tarde.','Submission is temporarily unavailable. Please try again later.'],
+    ['O formulário está temporariamente indisponível.',copy.unavailable],
+    ['Aguarde um minuto e volte a tentar.','Wait one minute and try again.'],
+    ['Foram feitas demasiadas tentativas. Aguarde um minuto antes de tentar novamente.','There have been too many attempts. Wait one minute before trying again.'],
+    ['Formato de pedido inválido.','The request format is invalid.'],
+    ['Reabra o formulário e tente novamente.','Reopen the form and try again.'],
+    ['A transmissão demorou demasiado. Os campos foram mantidos; verifique a ligação e tente novamente.','Submission took too long. Your entries have been kept; check your connection and try again.'],
+    ['O pedido excede o tamanho permitido.','Your request exceeds the permitted size.'],
+    ['Não foi possível ler o pedido.',"We couldn't read your request. Please try again."],
+    ['Verifique os campos assinalados.','Please check the highlighted fields.'],
+    ['Não foi possível validar o pedido. Reabra o formulário.',"We couldn't validate your request. Reopen the form and try again."],
+    ['A sessão do formulário precisa de ser renovada. Os campos foram mantidos. Aguarde a renovação e confirme novamente o envio.','Your form session needs to be renewed. Your entries have been kept. Wait for renewal, then confirm submission again.'],
+    ['Não foi possível registar o pedido neste momento. Os campos foram mantidos; tente novamente.',"We couldn't record your request right now. Your entries have been kept; please try again."],
+    ['O pedido está a ser processado ou foi alterado. Aguarde um momento e tente novamente com os mesmos dados.','Your request is being processed or has changed. Wait a moment and try again with the same details.'],
+    ['Não foi possível confirmar o envio. Os campos foram mantidos; aguarde um momento e tente novamente.',"We couldn't confirm submission. Your entries have been kept; wait a moment and try again."],
+    ['O serviço está temporariamente indisponível. Os campos foram mantidos; tente novamente mais tarde.','The service is temporarily unavailable. Your entries have been kept; please try again later.'],
+    ['Pedido inválido.','Your request is invalid.'],
+    ['O pedido contém campos não permitidos.','Your request contains unsupported fields.'],
+    ['Utilize texto neste campo.','Enter text in this field.'],
+    ['Remova os caracteres de controlo.','Remove control characters from this field.'],
+    ['Utilize uma única linha.','Use a single line in this field.'],
+    ['Indique um email válido, por exemplo nome@empresa.pt.',copy.emailInvalid],
+    ['Selecione uma das opções disponíveis.','Choose one of the available options.']
+  ]);
+  function serverMessage(message,fallback=copy.sendFailed) {
+    if(typeof message!=='string')return fallback;
+    if(!isEN)return message;
+    if(serverMessages.has(message))return serverMessages.get(message);
+    const length=message.match(/^Preencha entre (\d+) e (\d+) caracteres\.$/);
+    if(length)return 'Enter between '+Number(length[1]).toLocaleString(locale)+' and '+Number(length[2]).toLocaleString(locale)+' characters.';
+    return fallback;
+  }
   const configuredAPI = document.querySelector('meta[name="time-saver-api-origin"]')?.content || '';
   let apiBase = '', invalidAPI = false;
   if (configuredAPI) {
@@ -79,9 +110,19 @@ if (form) {
   let tokenReadyTimer;
   const originalLabel = submitLabel.textContent;
   const editableFields=Array.from(form.querySelectorAll('input,textarea,select'));
-  const limits = {name:[2,100],email:[3,254],description:[30,4000],company:[0,160],tools:[0,500],specifics:[0,500]};
-  const labels = {name:'Nome',email:'Email de contacto',description:'Descrição do processo',company:'Empresa',tools:'Ferramentas',service:'Tipo de ajuda',budget:'Orçamento',deadline:'Prazo',goal:'Objetivo',frequency:'Frequência',startingPoint:'Ponto de partida',specifics:'Detalhes'};
-  const context = {
+  const limits = {name:[2,100],email:[3,254],description:[description.minLength>0?description.minLength:30,description.maxLength>0?description.maxLength:4000],company:[0,160],tools:[0,500],specifics:[0,500]};
+  const labels = isEN
+    ? {name:'Name',email:'Contact email',description:'Process description',company:'Company',tools:'Tools',service:'Type of help',budget:'Budget',deadline:'Preferred deadline',goal:'Main goal',frequency:'Frequency',startingPoint:'Starting point',specifics:'Details'}
+    : {name:'Nome',email:'Email de contacto',description:'Descrição do processo',company:'Empresa',tools:'Ferramentas',service:'Tipo de ajuda',budget:'Orçamento',deadline:'Prazo',goal:'Objetivo',frequency:'Frequência',startingPoint:'Ponto de partida',specifics:'Detalhes'};
+  const context = isEN ? {
+    'Excel, macros e VBA':['Tell us which files you use, what you do manually and what you would like to automate.','For example: every month we combine several Excel files and repeat the same calculations and formatting. We would like to prepare everything in one step.','Are there any important rules or calculations?'],
+    'Automação de processos':['Describe the steps, who is involved and where work is repeated.','For example: we copy requests received by email into a spreadsheet, then notify the team. We would like to reduce these manual steps.','Which steps are currently done manually?'],
+    'Dashboards e relatórios':['Tell us where your data comes from, which indicators you need and how often you review them.','For example: we would like to combine sales and expenses in a dashboard based on our existing files, without rebuilding the report every month.','Which indicators would you like to track?'],
+    'Tratamento de dados':['Explain where your information is stored and what you need to combine, correct or organise.','For example: we have lists in several files, with different formats and duplicate records. We need organised data to work with.','What problems are there with your data?'],
+    'Integração entre ferramentas':['Tell us which tools you use and what information needs to move between them.','For example: requests arrive in one tool and are copied into another. We would like to avoid entering the same information twice.','What information needs to move between tools?'],
+    'Aplicação à medida':['Describe the process the application should support and the main things people need to do.','For example: we need an internal tool to record requests, track their status and view information in one place.','What should people be able to do in the application?'],
+    'Ainda não sei':['Tell us what you do today, what takes time and what you would like to improve.','For example: every month we repeat several steps to prepare information for the team. We would like to simplify the process and reduce errors.','Is there anything else that would help us understand what you need?']
+  } : {
     'Excel, macros e VBA':['Que ficheiros utiliza, o que faz manualmente e o que gostaria de automatizar?','Por exemplo: juntamos vários ficheiros Excel todos os meses e repetimos cálculos e formatações. Queremos preparar tudo num único passo.','Há regras ou cálculos importantes?'],
     'Automação de processos':['Descreva os passos da tarefa, quem intervém e onde costuma haver repetição.','Por exemplo: copiamos pedidos recebidos por email para uma folha e depois enviamos avisos à equipa. Queremos reduzir estes passos manuais.','Que passos são hoje feitos manualmente?'],
     'Dashboards e relatórios':['Diga de onde vêm os dados, que indicadores precisa de acompanhar e com que frequência.','Por exemplo: queremos reunir vendas e despesas num painel atualizado a partir dos ficheiros existentes, sem refazer o relatório todos os meses.','Que indicadores quer acompanhar?'],
@@ -95,7 +136,7 @@ if (form) {
     const fields=fieldNodes(name); (fields.find(field=>field.checked)||fields[0])?.focus();
   }
   function updateServiceContext() {
-    const values=context[form.elements.service.value]||context['Ainda não sei'];
+    const values=context[form.elements.service?.value]||context['Ainda não sei'];
     const guidance=document.querySelector('#service-guidance');
     if(guidance)guidance.textContent=values[0];
     description.placeholder=values[1];
@@ -104,9 +145,11 @@ if (form) {
   fieldNodes('service').forEach(field=>field.addEventListener('change',updateServiceContext));
   updateServiceContext();
   function updateCounter() {
-    document.querySelector('#description-count').textContent = description.value.length.toLocaleString('pt-PT') + ' / 4 000';
+    const counter=document.querySelector('#description-count');
+    if(counter)counter.textContent = description.value.length.toLocaleString(locale) + ' / '+limits.description[1].toLocaleString(locale);
   }
   description.addEventListener('input',updateCounter);
+  updateCounter();
   function setFieldError(name,message) {
     const inputs = fieldNodes(name);
     const error = document.getElementById(name+'-error');
@@ -129,16 +172,17 @@ if (form) {
     p.textContent = message; p.className = 'result-text';
     result.append(p); result.focus();
   }
-  function showErrors(errors) {
-    Object.keys(labels).forEach(name=>setFieldError(name,errors[name]));
-    showMessage('Há campos que precisam da sua atenção. Os dados que preencheu foram mantidos.');
+  function showErrors(errors,localized=false) {
+    const translated=Object.fromEntries(Object.entries(errors).map(([name,message])=>[name,localized?message:serverMessage(message,copy.fieldFallback)]));
+    Object.keys(labels).forEach(name=>setFieldError(name,translated[name]));
+    showMessage(copy.needsAttention);
     const list = document.createElement('ul');
-    for (const [name,message] of Object.entries(errors)) {
+    for (const [name,message] of Object.entries(translated)) {
       const item = document.createElement('li');
       const anchor = document.createElement('a');
-      if (form.elements[name]) {
+      if (Object.hasOwn(labels,name) && form.elements[name]) {
         anchor.href = '#'+(fieldNodes(name)[0]?.id||name);
-        anchor.textContent = (labels[name] || name)+': '+message;
+        anchor.textContent = labels[name]+': '+message;
         anchor.addEventListener('click',event=>{event.preventDefault();focusField(name);});
         item.append(anchor);
       } else item.textContent = message;
@@ -155,27 +199,26 @@ if (form) {
     try {
       availability.hidden=false;
       if (formDisabledByHosting) {
-        availability.textContent = 'O formulário ainda não está disponível. O envio de pedidos está temporariamente desativado.';
+        availability.textContent = copy.hostingDisabled;
         if(retryAvailability)retryAvailability.hidden=true;
         return false;
       }
-      availability.textContent='A verificar a disponibilidade do formulário…';
+      availability.textContent=copy.checking;
       const response = await fetch(apiBase+'/api/form-status',{cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(12_000)});
       const status = await response.json();
-      if (!response.ok || !status.available || typeof status.token !== 'string') throw new Error(status.message || 'O formulário está temporariamente indisponível.');
+      if (!response.ok || !status.available || typeof status.token !== 'string') throw new Error(status.message || copy.unavailable);
       token = status.token;
       if(sessionRefreshNeeded){submissionKey='';lastSignature='';sessionRefreshNeeded=false;}
       availability.hidden = true;
       if(retryAvailability)retryAvailability.hidden=true;
-      // A proteção temporal do servidor não deve impedir uma nova tentativa imediata.
       tokenReadyTimer = setTimeout(()=>{available=true;submit.disabled=busy || sent;},1600);
       return true;
     } catch (error) {
       token = '';
       availability.hidden = false;
-      availability.textContent = error.name === 'TimeoutError' || error.name === 'TypeError'
-        ? 'Não foi possível verificar o serviço. Os campos foram mantidos; volte a verificar quando a ligação estiver disponível.'
-        : error.message;
+      availability.textContent = ['TimeoutError','TypeError','SyntaxError','AbortError'].includes(error.name)
+        ? copy.checkFailed
+        : serverMessage(error.message,copy.unavailable);
       if(retryAvailability)retryAvailability.hidden=false;
       return false;
     } finally {
@@ -185,28 +228,30 @@ if (form) {
   }
   retryAvailability?.addEventListener('click',async()=>{
     if(busy || sent || checkingAvailability || formDisabledByHosting)return;
-    if(await refreshToken())showMessage('O serviço está novamente disponível e os campos foram mantidos. Verifique os dados e carregue em Enviar pedido de orçamento. O envio não foi repetido automaticamente.');
+    if(await refreshToken())showMessage(copy.checkRestored);
   });
   function collect() {
     const data = {};
-    ['name','email','description','company','service','tools','deadline','budget','website','goal','frequency','startingPoint','specifics'].forEach(name=>{data[name]=(form.elements[name]?.value||'').trim().normalize('NFC');});
+    const defaults={service:'Ainda não sei',deadline:'A definir',budget:'A definir',goal:'A definir',frequency:'A definir',startingPoint:'A definir'};
+    // A leitura opcional da política não é consentimento nem faz parte do pedido enviado.
+    ['name','email','description','company','service','tools','deadline','budget','website','goal','frequency','startingPoint','specifics'].forEach(name=>{data[name]=(form.elements[name]?.value||defaults[name]||'').trim().normalize('NFC');});
     return data;
   }
   function validate(data) {
     const errors = {};
     for (const [name,[min,max]] of Object.entries(limits)) {
-      if (data[name].length < min || data[name].length > max) errors[name] = 'Preencha entre '+min+' e '+max+' caracteres.';
+      if (data[name].length < min || data[name].length > max) errors[name] = translate('Preencha entre '+min+' e '+max+' caracteres.','Enter between '+min.toLocaleString(locale)+' and '+max.toLocaleString(locale)+' characters.');
     }
-    if (!form.elements.email.validity.valid || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errors.email = 'Indique um email válido, por exemplo nome@empresa.pt.';
+    if (!form.elements.email.validity.valid || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errors.email = copy.emailInvalid;
     return errors;
   }
   form.addEventListener('submit',async event=>{
     event.preventDefault();
     if (busy || sent) return;
-    if (!available) { showMessage('O formulário ainda não está disponível. O pedido não foi enviado.'); return; }
+    if (!available) { showMessage(copy.notSent); return; }
     const data = collect();
     const errors = validate(data);
-    if (Object.keys(errors).length) { showErrors(errors); return; }
+    if (Object.keys(errors).length) { showErrors(errors,true); return; }
     Object.keys(labels).forEach(name=>setFieldError(name,''));
     const signature = JSON.stringify(data);
     if (signature !== lastSignature || !submissionKey) {
@@ -215,7 +260,7 @@ if (form) {
     busy = true; submit.disabled = true;
     if(retryAvailability)retryAvailability.disabled=true;
     editableFields.forEach(field=>{field.disabled=true;});
-    form.setAttribute('aria-busy','true'); submitLabel.textContent = 'A enviar o pedido…';
+    form.setAttribute('aria-busy','true'); submitLabel.textContent = copy.sending;
     result.replaceChildren();
     try {
       const response = await fetch(apiBase+'/api/quote',{
@@ -226,26 +271,24 @@ if (form) {
       const payload = await response.json();
       if (response.ok && payload.accepted === true && payload.reference) {
         sent = true;
-        showMessage('O seu pedido foi aceite para envio. Referência: '+payload.reference+'. Esta confirmação indica aceitação pelo serviço de email; não confirma a entrega na caixa de entrada.',true);
-        submitLabel.textContent = 'Pedido aceite para envio';
+        showMessage(copy.received+' '+copy.reference+payload.reference+'. '+copy.emailAcceptance,true);
+        submitLabel.textContent = copy.accepted;
         form.reset();updateCounter();updateServiceContext();
         lastSignature='';submissionKey='';token='';
         if(retryAvailability)retryAvailability.hidden=true;
         const another=document.querySelector('#new-request');if(another)another.hidden=false;
       } else if (payload.errors) showErrors(payload.errors);
       else {
-        showMessage(payload.message || 'Não foi possível confirmar o envio. Os dados foram mantidos; tente novamente.');
+        showMessage(serverMessage(payload.message,copy.sendFailed));
         if (payload.renewKey) submissionKey = '';
         if (payload.refreshToken) {
           sessionRefreshNeeded=true;
           await refreshToken();
-          if(token){
-            showMessage('A sessão foi renovada e os campos foram mantidos. Verifique os dados e volte a carregar em Enviar pedido de orçamento. O envio não foi repetido automaticamente.');
-          }
+          if(token)showMessage(copy.renewed);
         }
       }
     } catch {
-      showMessage('Não foi possível confirmar o envio. Os dados foram mantidos. Verifique a ligação e tente novamente com os mesmos dados para evitar duplicados.');
+      showMessage(copy.connectionFailed);
     } finally {
       busy = false; form.setAttribute('aria-busy','false');
       editableFields.forEach(field=>{field.disabled=false;});

@@ -79,3 +79,28 @@ export async function validFormToken(token, env, now = Date.now()) {
   const age = now - Number(parts[0]);
   return age >= 1500 && age <= 7_200_000 && sameDigest(parts[2], await keyedHash(env.SECURITY_HMAC_KEY, `csrf:${parts[0]}.${parts[1]}`));
 }
+
+const DIAGNOSTIC_KEY_CONTEXT='time-saver-diagnostic-key-v1';
+const DIAGNOSTIC_TOKEN_CONTEXT='quote-crm-health-v1:';
+const DIAGNOSTIC_UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+async function diagnosticKey(env){
+  const key=env?.RESEND_API_KEY;
+  if(typeof key!=='string'||!/^re_[A-Za-z0-9_-]{8,256}$/.test(key))throw Error('diagnostic_configuration_invalid');
+  return keyedHash(key,DIAGNOSTIC_KEY_CONTEXT);
+}
+export async function issueDiagnosticToken(env,now=Date.now()){
+  if(!Number.isSafeInteger(now)||!/^\d{13}$/.test(String(now)))throw Error('diagnostic_time_invalid');
+  const key=await diagnosticKey(env),value=now+'.'+crypto.randomUUID();
+  return value+'.'+await keyedHash(key,DIAGNOSTIC_TOKEN_CONTEXT+value);
+}
+export async function validDiagnosticToken(token,env,now=Date.now()){
+  if(typeof token!=='string'||token.length!==115||!Number.isSafeInteger(now))return false;
+  const parts=token.split('.');
+  if(parts.length!==3||!/^\d{13}$/.test(parts[0])||!DIAGNOSTIC_UUID.test(parts[1])||!/^[a-f0-9]{64}$/.test(parts[2]))return false;
+  const age=now-Number(parts[0]);
+  if(age < -5000 || age > 60000)return false;
+  try{
+    const key=await diagnosticKey(env);
+    return sameDigest(parts[2],await keyedHash(key,DIAGNOSTIC_TOKEN_CONTEXT+parts[0]+'.'+parts[1]));
+  }catch{return false;}
+}

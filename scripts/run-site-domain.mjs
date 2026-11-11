@@ -1,6 +1,7 @@
 import { appendFile,readFile } from 'node:fs/promises';
 import { deploySiteDomain,readSiteModules } from './deploy-site-domain.mjs';
 import { probePublicTLS } from './probe-public-tls.mjs';
+import {readSiteSettings} from './site-settings.mjs';
 const env=process.env;
 if(env.GITHUB_REPOSITORY_ID!=='1452563434' || env.GITHUB_REPOSITORY!=='timesaverautomate/time-saver'
   || env.GITHUB_REF!=='refs/heads/main' || !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA || '')
@@ -23,7 +24,9 @@ let result;
 try{
   const modules=await readSiteModules();
   const config=JSON.parse(await readFile(new URL('../config/domain.json',import.meta.url),'utf8'));
+  const siteSettings=await readSiteSettings();
   result=await deploySiteDomain({env:{...env,FORM_ENABLED:config.quoteCollectionEnabled===true?'true':'false',
+    SEARCH_INDEXING_ENABLED:siteSettings.searchIndexing===true?'true':'false',
     QUOTE_CRM_ENABLED:config.quoteSheetSyncEnabled===true?'true':'false'},
     source:modules['proxy.mjs'],modules,mask:value=>console.log('::add-mask::'+value)});
 }
@@ -38,9 +41,9 @@ if(env.GITHUB_STEP_SUMMARY)await appendFile(env.GITHUB_STEP_SUMMARY,
   +'Domínio e cabeçalhos verificados: '+String(result.verified)+'\n\n'
   +'TLS 1.0/1.1 recusados e TLS 1.2/1.3 disponíveis no handshake: '+String(result.transportTLS?.verified===true)+'\n\n'
   +'Ficheiros no GitHub Pages; domínio e proteção através do Worker time-saver-edge. '
-  +'Envio direto sem base de dados de pedidos. A disponibilidade da API não substitui o teste real do formulário e da receção. Sem alterações de planos.\n');
+  +'Envio por email e registo privado no CRM de pedidos. A disponibilidade da API não substitui o teste real do formulário e da receção. Sem alterações de planos.\n');
 try{await report(result.verified?'success':'failure',result.verified
-  ? (result.contactApiConfigured?'Domínio protegido e API de email disponível; sem base de dados.':'Domínio, HTTPS e cabeçalhos verificados; site sem formulário.')
+  ? (result.contactApiConfigured?'Domínio protegido e API de email disponível; CRM privado preservado.':'Domínio, HTTPS e cabeçalhos verificados; site sem formulário.')
   : 'Configuração pendente: '+result.code+(result.httpStatus?' (HTTP '+result.httpStatus+')':''));}
 catch{console.error('Não foi possível registar o resultado final.');process.exitCode=1;}
 if(result.verified){

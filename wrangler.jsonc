@@ -10,6 +10,7 @@
   "vars": {
     "FORM_ENABLED": "false",
     "HSTS_ENABLED": "true",
+    "SEARCH_INDEXING_ENABLED": "false",
     "TIME_SAVER_REPOSITORY_ID": "1452563434"
   },
   "ratelimits": [

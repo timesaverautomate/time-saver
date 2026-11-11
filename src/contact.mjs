@@ -1,5 +1,5 @@
 import { validateSubmission,readBoundedJSON,BodyTimeoutError } from './validation.mjs';
-import { keyedHash,sameDigest } from './security.mjs';
+import { keyedHash,sameDigest,validDiagnosticToken } from './security.mjs';
 import { storeQuote,markQuoteReceived,verifyQuoteSheet } from './quote-sheets.mjs';
 
 const CONTACT_ORIGIN='https://timesaverautomate.com';
@@ -79,7 +79,12 @@ export async function handleContact(request,env,transport=fetch){
   const path=new URL(request.url).pathname;
   if(path==='/api/quote-crm-health'){
     if(request.method!=='GET'||!contactOrigin(request,false))return contactJSON({ready:false},403);
+    if(!await validDiagnosticToken(request.headers.get('X-Time-Saver-Diagnostic'),env))return contactJSON({ready:false},403);
+    if(env.QUOTE_CRM_ENABLED!=='true'||!contactConfigured(env))return contactJSON({ready:false,code:'crm_health_unavailable'},503);
     try{
+      const source=await contactSource(request,env);
+      const limited=await env.FORM_IP_RATE.limit({key:'diagnostic:'+source});
+      if(!limited.success)return contactJSON({ready:false,code:'crm_health_rate_limited'},429,{'Retry-After':'60'});
       await verifyQuoteSheet(env);
       return contactJSON({ready:true});
     }catch(error){

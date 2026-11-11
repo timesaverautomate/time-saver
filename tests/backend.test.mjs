@@ -62,7 +62,7 @@ test('validação do servidor rejeita dados inválidos, opções desconhecidas e
   await withMail(async()=>{calls++;return accepted();},async()=>{
     for (const invalid of [
       {email:'ana@empresa.test\r\nBcc:injetado@evil.test'},
-      {name:'A'}, {description:'Muito curto'}, {service:'Serviço não permitido'}, {budget:'Grátis'},
+      {name:'A'}, {description:'curto'}, {service:'Serviço não permitido'}, {budget:'Grátis'},
       {deadline:'Amanhã'}, {tools:'x'.repeat(501)}, {name:['Ana']}, {to:'injetado@evil.test'}
     ]) {
       const response=await worker.fetch(await quoteRequest(env,invalid),env);
