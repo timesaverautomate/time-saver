@@ -13,12 +13,12 @@ import prospect_crm as crm
 import outreach_approved as delivery
 
 
-def company(osm_id=101, email="geral@exemplo.pt", site="https://exemplo.pt"):
+def company(osm_id=101, email="geral@exemplo.pt", site="https://exemplo.pt", basis="Consentimento documentado"):
     row = crm.candidate({"type":"node","id":osm_id,"tags":{
         "name":"Micro Empresa Teste","contact:email":email,
         "office":"accountant","website":site
     }}, "Maia", "suburbio")
-    row[23] = "Pessoa coletiva - fundamento validado"
+    row[23] = basis
     row[24] = "Não"
     return row
 
@@ -53,7 +53,7 @@ class SafeOutreachTests(unittest.TestCase):
 
     def test_dgc_and_proof_are_mandatory(self):
         day = date(2026,11,11)
-        row = company()
+        row = company(basis="Pessoa coletiva - fundamento validado")
         review = approved(row)
         for index, value in [(13,""),(13,"2026-09-01"),(14,""),(15,""),(18,"2026-09-01")]:
             x = list(review)
@@ -67,6 +67,16 @@ class SafeOutreachTests(unittest.TestCase):
         row[23] = "Pessoa coletiva - fundamento validado"
         row[24] = "Sim"
         self.assertFalse(crm.evaluate_send_eligibility(row,review,today=day)[0])
+
+
+    def test_resend_rejects_cold_outreach_even_when_portugal_allows_corporate(self):
+        row=company(basis="Pessoa coletiva - fundamento validado")
+        review=approved(row)
+        selected,reasons=delivery.select_approved([row],[review],today=date(2026,11,11))
+        self.assertEqual(selected,[])
+        self.assertEqual(reasons["Resend exige opt-in; cold outreach proibido"],1)
+        # A verificação da lei e a política do fornecedor são distintos.
+        self.assertTrue(crm.evaluate_send_eligibility(row,review,today=date(2026,11,11))[0])
 
     def test_duplicate_domain_or_history(self):
         day=date(2026,11,11)
