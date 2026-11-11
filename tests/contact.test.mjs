@@ -21,7 +21,7 @@ function fixture(){
     token:await issueContactToken(env,Date.now()-2000)});
   return {env,calls,rateKeys,transport,request,body};
 }
-test('envio direto aceita apenas resposta positiva, envia texto e preserva destinatário e assunto fixos',async()=>{
+test('envio direto aceita apenas resposta positiva, envia texto e preserva destinatário fixo e assunto identificado',async()=>{
   const f=fixture(),body=await f.body();body.description+=' <img src=x onerror=alert(1)>';
   const response=await handleContact(f.request(body),f.env,f.transport),result=await response.json();
   assert.equal(response.status,200);assert.equal(result.accepted,true);assert.match(result.reference,/^TS-[A-F0-9]{20}$/);
@@ -29,7 +29,7 @@ test('envio direto aceita apenas resposta positiva, envia texto e preserva desti
   const sent=JSON.parse(f.calls[0].options.body);
   assert.equal(f.calls[0].url,'https://api.resend.com/emails');assert.equal(f.calls[0].options.redirect,'manual');
   assert.deepEqual(sent.to,['timesaverautomate@gmail.com']);assert.equal(sent.from,'Time Saver <pedidos@timesaverautomate.com>');
-  assert.equal(sent.reply_to,body.email);assert.equal(sent.subject,'Time Saver — Novo pedido de orçamento');assert.equal(sent.html,undefined);
+  assert.equal(sent.reply_to,body.email);assert.equal(sent.subject,body.name+' — Time Saver — Novo pedido de orçamento — '+result.reference);assert.equal(sent.html,undefined);
   for(const value of [body.service,body.goal,body.frequency,body.startingPoint,body.specifics,body.description])assert.ok(sent.text.includes(value));
   assert.ok(f.rateKeys.every(key=>!key.includes('192.0.2.1')));
 });

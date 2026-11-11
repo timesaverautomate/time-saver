@@ -1,6 +1,6 @@
-# Organização proposta para o email da Time Saver
+# Organização do email da Time Saver
 
-Usaria `timesaverautomate@gmail.com` como caixa central e a folha CRM como registo do estado comercial, orçamento e próxima ação. A organização abaixo é uma proposta; não foram criadas etiquetas, filtros ou respostas automáticas na conta.
+A caixa central é `timesaverautomate@gmail.com`; a folha CRM regista o estado comercial, orçamento e próxima ação. As etiquetas foram criadas e as mensagens existentes organizadas. Os filtros permanentes estão preparados num ficheiro XML entregue na conversa e ficam ativos após importação no Gmail. Não foram configuradas respostas automáticas.
 
 ## Etiquetas
 
@@ -10,10 +10,12 @@ Usaria `timesaverautomate@gmail.com` como caixa central e a folha CRM como regis
 | `02 Aguardar resposta` | Conversas em que a Time Saver já respondeu e aguarda esclarecimentos ou decisão. |
 | `03 Clientes e projetos` | Correspondência de projetos aprovados e em curso. |
 | `04 Agenda` | Confirmações, alterações e cancelamentos do Calendly. |
-| `05 Gestão` | Faturas de fornecedores, domínio, alojamento e assuntos administrativos. |
+| `05 Gestão/Faturas` | Faturas e confirmações de pagamentos. |
+| `05 Gestão/Domínio` | Registo, renovação e avisos do domínio. |
 | `06 Técnico/Alertas` | Falhas de envio, publicações com erro, alertas de acesso e problemas que exigem ação. |
 | `06 Técnico/Rotina` | Notificações de sucesso e informação técnica de rotina já identificada. |
-| `06 Técnico/Testes` | Emails de testes internos confirmados, marcados manualmente e arquivados após validação. |
+| `06 Técnico/Testes internos` | Emails de testes internos confirmados, marcados manualmente e arquivados após validação. |
+| `06 Técnico/Histórico` | Avisos antigos de problemas cuja correção já foi confirmada. |
 | `07 Prospecção` | Conversas comerciais iniciadas pela Time Saver, separadas dos pedidos recebidos espontaneamente. |
 
 ## Percurso diário
@@ -36,7 +38,11 @@ from:pedidos@timesaverautomate.com subject:"Time Saver — Novo pedido de orçam
 
 Depois criar um filtro que aplique `01 Pedidos do sítio` e os mantenha na caixa de entrada. Manter a proteção de spam do Gmail ativa. Um remetente visível não substitui a autenticação da mensagem.
 
-Desativaria a **vista de conversa** nesta caixa: o formulário usa um assunto fixo e o mesmo remetente, pelo que é útil apresentar cada pedido separadamente. A referência `TS-…` permite relacionar o email com o CRM. Esta opção fica em **Definições → Ver todas as definições → Geral → Vista de conversa**.
+Os novos pedidos mostram o nome no início e uma referência única no fim do assunto. Exemplo: `Maria Silva — Time Saver — Novo pedido de orçamento — TS-…`. Mesmo dois pedidos do mesmo nome têm referências e assuntos diferentes. O texto fixo antigo permanece no assunto, pelo que os filtros anteriores continuam compatíveis.
+
+Os emails já recebidos conservam o assunto original. Para os apresentar individualmente, desativar a **vista de conversa** em **Definições → Ver todas as definições → Geral → Vista de conversa → Vista de conversa desativada → Guardar alterações**. A ligação disponível não permite alterar esta preferência ou renomear mensagens recebidas. A referência `TS-…` continua a relacionar cada email com o CRM.
+
+As tentativas iniciadas antes da atualização conservam o assunto anterior durante a validade do ticket, para preservar a idempotência do Resend. Novas sessões recebem o formato identificado com nome e referência. Não se reenviam os pedidos antigos para lhes mudar o título.
 
 As notificações técnicas de sucesso podem ser etiquetadas e arquivadas automaticamente após testar os critérios. Falhas, alertas de segurança, problemas de pagamento, renovações e alterações de reuniões devem continuar visíveis. Evitaria filtros amplos por fornecedor que misturem informação de rotina com alertas.
 

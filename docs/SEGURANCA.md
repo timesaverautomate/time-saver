@@ -6,7 +6,7 @@
 
 Não foi identificado um caminho ativo para executar JavaScript, HTML, SQL, VBA ou comandos introduzidos nos campos. Os valores são validados e enviados como **texto simples**. Mensagens da API são apresentadas com `textContent` e elementos criados de forma segura; não se usa `innerHTML` ou `eval` para apresentar conteúdo. Não há uploads, SQL, execução de macros, instalação de aplicações ou interpretação de código enviado pelo visitante. É possível escrever texto parecido com código, mas esse texto não é executado. Uma lista de palavras proibidas não substituiria estas proteções.
 
-Destinatário, remetente, assunto e URL do fornecedor são fixos no servidor. O email validado do visitante só é usado no Reply-To. Comprimentos, tipos, caracteres de controlo e opções são verificados no servidor, incluindo quando alguém contorna o JavaScript. Campos adicionais como destinatários são rejeitados. Segredos não são enviados ao navegador.
+Destinatário, remetente e URL do fornecedor são fixos no servidor. Desde a atualização de identificação dos pedidos em 11/11/2026, o assunto é construído no servidor com nome validado sem controlos/invisíveis, marcador fixo e referência única; as tentativas anteriores mantêm o assunto antigo para preservar a idempotência. O email validado do visitante só é usado no Reply-To. Comprimentos, tipos, caracteres de controlo e opções são verificados no servidor, incluindo quando alguém contorna o JavaScript. Campos adicionais como destinatários são rejeitados. Segredos não são enviados ao navegador.
 
 ## Correções aplicadas
 

@@ -7,6 +7,17 @@ const CONTACT_TO='timesaverautomate@gmail.com';
 const CONTACT_FROM='Time Saver <pedidos@timesaverautomate.com>';
 const TICKET_LIFETIME=23*60*60*1000;
 
+export function quoteEmailSubject(name,reference,subjectVersion=2){
+  if(typeof name!=='string'||!/^TS-[A-F0-9]{20}$/.test(reference))throw Error('contact_subject_invalid');
+  // O texto fixo mantém os filtros existentes compatíveis. Nome apresentado como
+  // texto, sem controlos/invisíveis, e referência do servidor para separar pedidos.
+  if(subjectVersion===1)return 'Time Saver — Novo pedido de orçamento';
+  const clean=name.normalize('NFC').replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu,' ')
+    .replace(/\s+/gu,' ').trim();
+  const displayName=Array.from(clean).slice(0,100).join('')||'Pedido do sítio';
+  return displayName+' — Time Saver — Novo pedido de orçamento — '+reference;
+}
+
 function contactEmail(data,reference,created){
   const rows=[['Referência',reference],['Formulário iniciado em (UTC)',new Date(created).toISOString()],
     ['Tipo de ajuda',data.service],['Objetivo principal',data.goal],['Frequência',data.frequency],
@@ -64,7 +75,7 @@ async function contactSource(request,env){
 }
 export async function issueContactToken(env,now=Date.now()){
   const value=now+'.'+crypto.randomUUID();
-  return value+'.'+await keyedHash(env.SECURITY_HMAC_KEY,'contact-ticket:'+value);
+  return value+'.'+await keyedHash(env.SECURITY_HMAC_KEY,'contact-ticket-v2:'+value);
 }
 export async function parseContactToken(token,env,now=Date.now()){
   if(typeof token!=='string')return null;
@@ -72,8 +83,13 @@ export async function parseContactToken(token,env,now=Date.now()){
   if(parts.length!==3||!/^\d{13}$/.test(parts[0])||!/^[a-f0-9-]{36}$/.test(parts[1])||!/^[a-f0-9]{64}$/.test(parts[2]))return null;
   const created=Number(parts[0]),age=now-created;
   if(age<1500||age>TICKET_LIFETIME)return null;
-  const signature=await keyedHash(env.SECURITY_HMAC_KEY,'contact-ticket:'+parts[0]+'.'+parts[1]);
-  return sameDigest(parts[2],signature)?{created,nonce:parts[1]}:null;
+  const value=parts[0]+'.'+parts[1];
+  const signature=await keyedHash(env.SECURITY_HMAC_KEY,'contact-ticket-v2:'+value);
+  if(sameDigest(parts[2],signature))return {created,nonce:parts[1],subjectVersion:2};
+  // Preserva exatamente o assunto dos tickets emitidos antes desta atualização,
+  // incluindo repetições cujo email já tenha sido aceite pelo Resend.
+  const legacy=await keyedHash(env.SECURITY_HMAC_KEY,'contact-ticket:'+value);
+  return sameDigest(parts[2],legacy)?{created,nonce:parts[1],subjectVersion:1}:null;
 }
 async function contactRequest(request,env,transport){
   const path=new URL(request.url).pathname;
@@ -145,7 +161,7 @@ async function contactRequest(request,env,transport){
       method:'POST',redirect:'manual',signal:AbortSignal.timeout(12_000),
       headers:{Authorization:'Bearer '+env.RESEND_API_KEY,'Content-Type':'application/json','Idempotency-Key':'time-saver-contact/'+fingerprint},
       body:JSON.stringify({from:CONTACT_FROM,to:[CONTACT_TO],reply_to:data.email,
-        subject:'Time Saver — Novo pedido de orçamento',text})
+        subject:quoteEmailSubject(data.name,reference,ticket.subjectVersion),text})
     });
     const result=await response.json().catch(()=>null);
     if(response.ok&&typeof result?.id==='string'&&result.id.length>0){

@@ -131,7 +131,7 @@ A versão de revisão não é indexável. O preflight bloqueia a publicação co
 ## 7. Validar antes de abrir ao público
 
 - Faça uma submissão válida com dados de teste não sensíveis e confirme a mensagem no Gmail, incluindo spam. Compare a referência com o email recebido.
-- Confirme o destinatário fixo, remetente verificado, assunto fixo e Reply-To do visitante.
+- Confirme o destinatário fixo, remetente verificado, assunto com nome e referência única, e Reply-To do visitante.
 - Verifique SPF, DKIM e DMARC nos cabeçalhos da mensagem.
 - Confirme que um duplo clique ou repetição do mesmo pedido não gera dois emails.
 - Teste uma falha controlada do fornecedor em ambiente de teste; os dados devem manter-se na página e a nova tentativa deve reutilizar a mesma referência.

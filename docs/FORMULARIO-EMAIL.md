@@ -1,10 +1,10 @@
-# Formulário atual: email direto e integração com Sheets em preparação
+# Formulário atual: email e integração com Sheets
 
 ## Fluxo e conservação
 
 1. O visitante abre o domínio HTTPS e recebe um ticket assinado, mantido na memória da página.
 2. Escolhe o tipo de ajuda e descreve o processo. O servidor valida novamente todos os valores.
-3. O Worker envia texto simples pelo Resend, com assunto e destinatário fixos. Não há gravação intermédia do pedido.
+3. O Worker regista primeiro o pedido na folha privada do CRM e envia texto simples pelo Resend para o destinatário fixo. O assunto começa pelo nome validado e inclui uma referência única do servidor.
 4. A página mostra sucesso apenas quando o Resend devolve um identificador de aceitação. A entrega efetiva é verificada na caixa Gmail, não inferida dessa resposta.
 
 A sincronização do formulário com o Google Sheets está ativa: os pedidos aceites são guardados na folha privada `Pedidos do Site`. Não existe uma base de dados de pedidos em D1, KV, Durable Objects ou filas; não regista o conteúdo nos logs. A observabilidade do Worker está desativada. Os campos permanecem na página aberta em caso de falha e são limpos após a aceitação. As funções de preenchimento automático pertencem ao navegador do visitante.
@@ -22,6 +22,8 @@ Em 10/11/2026 o percurso real formulário → Google Sheets → Resend foi confi
 ## Remetente e DNS
 
 Remetente fixo: `Time Saver <pedidos@timesaverautomate.com>`. Destinatário fixo: `timesaverautomate@gmail.com`. O visitante apenas define o Reply-To através de um email validado. Corpo de texto simples, sem HTML e sem anexos. Referência determinística e data do início do formulário incluídas; o cabeçalho Date do email indica o envio.
+
+Assunto de novas sessões: `Nome — Time Saver — Novo pedido de orçamento — TS-…`. O nome apresentado é normalizado e fica sem controlos ou caracteres invisíveis; a referência única impede que pedidos independentes tenham o mesmo assunto. O marcador fixo antigo mantém os filtros Gmail compatíveis. Tickets anteriores continuam a usar o assunto antigo para não alterar a mensagem de uma tentativa já aceite pelo fornecedor. A mudança não renomeia emails recebidos.
 
 O teste do remetente foi recebido na caixa de entrada em 10/11/2026. Os cabeçalhos recebidos pelo Gmail confirmam **SPF, DKIM e DMARC pass**. A política DMARC observada é `p=none`, de monitorização. Para futuras alterações de domínio:
 

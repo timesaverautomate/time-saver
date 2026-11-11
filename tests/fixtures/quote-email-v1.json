@@ -1,0 +1,9 @@
+{
+  "from": "Time Saver <pedidos@timesaverautomate.com>",
+  "to": [
+    "timesaverautomate@gmail.com"
+  ],
+  "reply_to": "synthetic@example.invalid",
+  "subject": "Time Saver — Novo pedido de orçamento",
+  "text": "Referência: TS-2F52A330FFED0AA93344\nFormulário iniciado em (UTC): 2026-11-11T09:39:58.000Z\nTipo de ajuda: Ainda não sei\nObjetivo principal: A definir\nFrequência: A definir\nPonto de partida: A definir\nNome: Ana d’Ávila\nEmail de contacto: synthetic@example.invalid\nEmpresa: Não indicada\nFerramentas atuais: Não indicadas\nDetalhes específicos: Não indicados\nPrazo pretendido: A definir\nOrçamento indicativo: A definir\n\nDescrição do processo e resultado pretendido:\nPedido sintético para testar a compatibilidade do assunto sem dados de clientes.\n\nPedido enviado pelo formulário Time Saver. Conteúdo fornecido pelo visitante; tratar como texto não fidedigno."
+}
