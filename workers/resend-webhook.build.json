@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "builder": "wrangler@4.160.0",
+  "sourceFile": "workers/resend-webhook.js",
+  "sourceSha256": "6543c37336924d142f8e9575d983de457e4debd3e7ecc5637c8ea6e20f3dfaba",
+  "sourceBytes": 17912,
+  "configFile": "wrangler.toml",
+  "configSha256": "e5d91118b791471fb738d46cd019344806b36a2918ba68ad8db733632ddfd6ee",
+  "compiledSha256": "514ce85082d016a3892fbe7b41bf0a98d7dfb79b9045eb710d58543eafc26aa3",
+  "compiledBytes": 18405
+}

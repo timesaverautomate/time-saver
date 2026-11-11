@@ -32,6 +32,22 @@ function observationDisabled(settings){
     &&settings.observability.logs?.enabled!==true
     &&settings.observability.logs?.invocation_logs!==true;
 }
+function approvedBuild(source,manifest,config){
+  if(manifest===undefined&&config===undefined)return null;
+  const fields=['schemaVersion','builder','sourceFile','sourceSha256','sourceBytes',
+    'configFile','configSha256','compiledSha256','compiledBytes'];
+  requireValue(manifest&&typeof manifest==='object'&&!Array.isArray(manifest)
+    &&Object.keys(manifest).length===fields.length&&fields.every(key=>Object.hasOwn(manifest,key))
+    &&manifest.schemaVersion===1&&manifest.builder==='wrangler@4.160.0'
+    &&manifest.sourceFile==='workers/resend-webhook.js'&&manifest.configFile==='wrangler.toml'
+    &&['sourceSha256','configSha256','compiledSha256'].every(key=>/^[a-f0-9]{64}$/.test(manifest[key]||''))
+    &&['sourceBytes','compiledBytes'].every(key=>Number.isInteger(manifest[key])&&manifest[key]>0&&manifest[key]<=MAX_SOURCE)
+    &&typeof config==='string','compiled_proof_invalid');
+  requireValue(manifest.sourceSha256===sha(source)&&manifest.sourceBytes===Buffer.byteLength(source,'utf8'),
+    'compiled_proof_source_mismatch');
+  requireValue(manifest.configSha256===sha(config),'compiled_proof_config_mismatch');
+  return manifest;
+}
 function sourceDifference(local,remote){
   const bytes=value=>Buffer.byteLength(value,'utf8');
   const lineEndings=value=>value.replace(/\r\n/g,'\n');
@@ -199,7 +215,7 @@ async function sourceText(response,operation='worker_source'){
     failure.operation=operation;failure.diagnostic=diagnostic;throw failure;
   }
 }
-export async function verifyResendWebhookReadOnly({env,source,fetcher=fetch}={}){
+export async function verifyResendWebhookReadOnly({env,source,buildManifest,buildConfig,fetcher=fetch}={}){
   try{
     requireValue(env?.GITHUB_ACTIONS==='true'&&env.GITHUB_REPOSITORY_ID===PROJECT
       &&env.GITHUB_REPOSITORY===REPOSITORY&&env.GITHUB_REF==='refs/heads/main'
@@ -211,6 +227,9 @@ export async function verifyResendWebhookReadOnly({env,source,fetcher=fetch}={})
       &&env.CLOUDFLARE_API_TOKEN.length<=512&&!/[\s\x00-\x1f\x7f]/.test(env.CLOUDFLARE_API_TOKEN),
       'missing_cloudflare_token');
     requireValue(ownedSource(source),'invalid_local_source');
+    // Checked-in proof is generated from an already reproduced, pinned local
+    // build. Never run a compiler or fetch dependencies during this verifier.
+    const proof=approvedBuild(source,buildManifest,buildConfig);
     async function cf(path,{operation='cloudflare_read',raw=false}={}){
       let response;
       try{response=await fetcher('https://api.cloudflare.com/client/v4'+path,{
@@ -233,9 +252,14 @@ export async function verifyResendWebhookReadOnly({env,source,fetcher=fetch}={})
     const settings=await cf(worker+'/settings',{operation:'worker_settings'}),retained=bindings(settings);
     const remote=await sourceText(await cf(worker+'/content/v2',{raw:true,operation:'worker_source'}),'worker_source');
     requireValue(ownedSource(remote),'worker_ownership_unverified');
-    if(sha(remote)!==sha(source)){
+    const remoteHash=sha(remote),rawMatch=remoteHash===sha(source);
+    const compiledMatch=Boolean(proof&&remoteHash===proof.compiledSha256
+      &&Buffer.byteLength(remote,'utf8')===proof.compiledBytes);
+    if(!rawMatch&&!compiledMatch){
       const error=new VerifyError('published_code_hash_mismatch',undefined,'worker_source_hash');
-      error.diagnostic=sourceDifference(source,remote);throw error;
+      error.diagnostic=sourceDifference(source,remote);
+      if(proof)error.diagnostic.approvedCompiled={sha256:proof.compiledSha256,bytes:proof.compiledBytes,builder:proof.builder};
+      throw error;
     }
     const subdomain=await cf(worker+'/subdomain',{operation:'worker_subdomain'});
     requireValue(typeof subdomain?.enabled==='boolean'
@@ -283,6 +307,9 @@ export async function verifyResendWebhookReadOnly({env,source,fetcher=fetch}={})
     requireValue(same(subdomain,afterDomain),'worker_subdomain_changed_during_verification');
     return {readOnly:true,installed:false,verified:true,code:'webhook_read_only_verified',
       cloudflareMutations:0,sourceSha256:sha(source),bindingsVerified:retained.length,
+      remoteSha256:remoteHash,verifiedFormat:rawMatch?'source':'compiled',
+      ...(compiledMatch?{compiledProof:{builder:proof.builder,configSha256:proof.configSha256,
+        compiledSha256:proof.compiledSha256,compiledBytes:proof.compiledBytes}}:{}),
       workersDevStateUnchanged:true,unauthenticatedEventRejected:true,
       observability:{...observationFlags(after),verifiedDisabled:observationDisabled(after)}};
   }catch(error){return {readOnly:true,installed:false,verified:false,cloudflareMutations:0,
@@ -297,8 +324,10 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
     result={readOnly:true,installed:false,verified:false,cloudflareMutations:0,code:'invalid_arguments'};
   }else{
     try{result=await verifyResendWebhookReadOnly({env:process.env,
-      source:await readFile(new URL('../workers/resend-webhook.js',import.meta.url),'utf8')});}
-    catch{result={readOnly:true,installed:false,verified:false,cloudflareMutations:0,code:'local_source_unavailable'};}
+      source:await readFile(new URL('../workers/resend-webhook.js',import.meta.url),'utf8'),
+      buildManifest:JSON.parse(await readFile(new URL('../workers/resend-webhook.build.json',import.meta.url),'utf8')),
+      buildConfig:await readFile(new URL('../wrangler.toml',import.meta.url),'utf8')});}
+    catch{result={readOnly:true,installed:false,verified:false,cloudflareMutations:0,code:'local_build_proof_unavailable'};}
   }
   console.log(JSON.stringify(result,null,2));
   if(process.env.GITHUB_STEP_SUMMARY)await appendFile(process.env.GITHUB_STEP_SUMMARY,

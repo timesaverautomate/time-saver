@@ -7,6 +7,8 @@ on:
       - 'scripts/audit-repository-secrets.py'
       - 'tests/secret-audit.test.mjs'
       - 'workers/resend-webhook.js'
+      - 'workers/resend-webhook.build.json'
+      - 'wrangler.toml'
       - 'scripts/deploy-resend-webhook.mjs'
       - 'scripts/verify-resend-webhook-readonly.mjs'
       - 'tests/webhook-readonly.test.mjs'

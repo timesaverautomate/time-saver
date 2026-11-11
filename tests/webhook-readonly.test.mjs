@@ -1,10 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {verifyResendWebhookReadOnly} from '../scripts/verify-resend-webhook-readonly.mjs';
 const SOURCE=await readFile(new URL('../workers/resend-webhook.js',import.meta.url),'utf8');
 const ACCOUNT='a'.repeat(32),WORKER='timesaver-resend-webhook';
 const ORIGIN='https://'+WORKER+'.time-saver-fixture.workers.dev';
+const digest=text=>createHash('sha256').update(text).digest('hex');
+const buildConfig='name = "timesaver-resend-webhook"\nmain = "workers/resend-webhook.js"\n';
+function proofFor(compiled){return {schemaVersion:1,builder:'wrangler@4.160.0',
+  sourceFile:'workers/resend-webhook.js',sourceSha256:digest(SOURCE),sourceBytes:Buffer.byteLength(SOURCE),
+  configFile:'wrangler.toml',configSha256:digest(buildConfig),
+  compiledSha256:digest(compiled),compiledBytes:Buffer.byteLength(compiled)};}
 function fixture({observability={enabled:true,logs:{enabled:true,invocation_logs:true}},remoteSource=SOURCE,
   bindingChange=false,missingCoordinator=false,wrongClass=false,unsignedStatus=401,healthExtra=false,
   multipart=false,missingWorker=false,subdomainEnabled=true}={}){
@@ -130,4 +137,38 @@ test('source-map-only and genuine security-code changes remain mismatches with b
   assert.equal(r.diagnostic.remote.markers.googleRedirectManual,false);assert.equal(r.diagnostic.remote.markers.googleTimeout12000,false);
   assert.equal(r.diagnostic.equivalentAfter.combinedTransportNormalization,false);
   assert.ok(f.calls.every(c=>c.options.method==='GET'));
+});
+
+test('an approved compiled digest is accepted exactly when bound to this source, configuration and pinned builder',async()=>{
+  const compiled='// unit fixture compiled output\n'+SOURCE;
+  const f=fixture({remoteSource:compiled});f.options.buildManifest=proofFor(compiled);f.options.buildConfig=buildConfig;
+  const r=await verifyResendWebhookReadOnly(f.options);assert.equal(r.verified,true,JSON.stringify(r));
+  assert.equal(r.verifiedFormat,'compiled');assert.equal(r.remoteSha256,digest(compiled));assert.equal(r.sourceSha256,digest(SOURCE));
+  assert.equal(r.compiledProof.builder,'wrangler@4.160.0');assert.equal(r.compiledProof.configSha256,digest(buildConfig));
+  assert.equal(r.cloudflareMutations,0);assert.ok(f.calls.filter(c=>c.url.startsWith('https://api.cloudflare.com')).every(c=>c.options.method==='GET'));
+  const altered=fixture({remoteSource:compiled+'\n// unapproved change'});altered.options.buildManifest=proofFor(compiled);altered.options.buildConfig=buildConfig;
+  const failed=await verifyResendWebhookReadOnly(altered.options);assert.equal(failed.verified,false);assert.equal(failed.code,'published_code_hash_mismatch');
+});
+
+test('stale source or config, unsupported builder and malformed compiled proof fail before any network',async()=>{
+  const compiled='// unit fixture compiled output\n'+SOURCE;
+  for(const [changes,config,source,code]of [
+    [{sourceSha256:'0'.repeat(64)},buildConfig,SOURCE,'compiled_proof_source_mismatch'],
+    [{},buildConfig+'# changed\n',SOURCE,'compiled_proof_config_mismatch'],
+    [{builder:'wrangler@latest'},buildConfig,SOURCE,'compiled_proof_invalid'],
+    [{compiledSha256:'not-a-digest'},buildConfig,SOURCE,'compiled_proof_invalid'],
+    [{compiledBytes:1.5},buildConfig,SOURCE,'compiled_proof_invalid'],
+    [{},buildConfig,SOURCE+'\n// new source','compiled_proof_source_mismatch']
+  ]){
+    const f=fixture({remoteSource:compiled});Object.assign(f.options,{buildManifest:{...proofFor(compiled),...changes},buildConfig:config,source});
+    const r=await verifyResendWebhookReadOnly(f.options);assert.equal(r.verified,false);assert.equal(r.code,code);assert.equal(f.calls.length,0);
+  }
+});
+
+test('checked-in build proof matches current source and configuration and records the actually reproduced pinned build',async()=>{
+  const manifest=JSON.parse(await readFile(new URL('../workers/resend-webhook.build.json',import.meta.url),'utf8'));
+  const config=await readFile(new URL('../wrangler.toml',import.meta.url),'utf8');
+  assert.equal(manifest.sourceSha256,digest(SOURCE));assert.equal(manifest.sourceBytes,Buffer.byteLength(SOURCE));
+  assert.equal(manifest.configSha256,digest(config));assert.equal(manifest.builder,'wrangler@4.160.0');
+  assert.equal(manifest.compiledBytes,18405);assert.equal(manifest.compiledSha256,'514ce85082d016a3892fbe7b41bf0a98d7dfb79b9045eb710d58543eafc26aa3');
 });
