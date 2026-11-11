@@ -104,6 +104,25 @@ class ProspectCrmTests(unittest.TestCase):
         row[20] = "1"
         self.assertFalse(crm.evaluate_send_eligibility(row, review)[0])
 
+    def test_simulate_resend_reads_only_and_never_sends(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        row = crm.candidate(sample(), "Porto")
+        review = crm.review_row(row, 2)
+        review[8] = "Verificado"
+        review[9] = "Consentimento documentado"
+        fake = SimpleNamespace(
+            raise_for_status=lambda: None,
+            json=lambda: {"values": [crm.REVIEW_HEADERS, review]},
+        )
+        with patch.object(crm.requests, "get", return_value=fake) as get, \\
+             patch.object(crm.requests, "post") as post:
+            result = crm.simulate_resend(SimpleNamespace(token="fake"), [row])
+        self.assertEqual(result["eligible"], 0)
+        self.assertEqual(result["selected"], 0)
+        self.assertEqual(get.call_count, 1)
+        post.assert_not_called()
+
     def test_reject_personal_email(self):
         self.assertIsNone(crm.candidate(sample(email="joana@alfa.pt"), "Porto"))
 
