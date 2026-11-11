@@ -16,6 +16,8 @@ on:
       - '.github/workflows/prospect-crm.yml'
       - 'scripts/prospect_crm.py'
       - 'tests/test_prospect_crm.py'
+      - 'scripts/resend_events.py'
+      - 'tests/test_resend_events.py'
 permissions:
   contents: read
 concurrency:
@@ -34,7 +36,7 @@ jobs:
       - name: Instalar dependencias
         run: pip install google-auth requests
       - name: Testes de seguranca sem pesquisa ou escrita
-        run: python -m unittest discover -s tests -p 'test_prospect_crm.py' -v
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
   pesquisar:
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
@@ -47,7 +49,7 @@ jobs:
       - name: Instalar dependencias
         run: pip install google-auth requests
       - name: Testes de seguranca do CRM
-        run: python -m unittest discover -s tests -p 'test_prospect_crm.py' -v
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
       - name: Pesquisa ou simulação Resend (sem envios)
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
