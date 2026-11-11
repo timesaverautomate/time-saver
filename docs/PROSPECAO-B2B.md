@@ -8,25 +8,20 @@ O motor programa 8 zonas/dia: 3 subúrbios na região do Porto, 2 na região de 
 
 A localidade do CRM é retirada de `addr:city` quando a fonte a fornece. Quando não existe, apresenta-se `Área de <zona> (aproximada)` e uma nota a pedir confirmação. A ausência de website não elimina um candidato que tenha uma caixa comercial genérica identificada; exige investigação adicional.
 
-## Prioridade absoluta: dimensão da empresa
+## Prioridades finais de pesquisa e envio — 12/11/2026
 
-A ordem de investigação e de seleção do lote comercial é **lexicográfica**:
-1. **Microempresas verificadas** (1–9 trabalhadores).
-2. **Pequenas empresas verificadas** (10–49 trabalhadores).
-3. **Empresas de dimensão desconhecida, sem sinal de marca/cadeia** — entram para investigação, sem classificação fictícia.
-4. **Empresas de dimensão desconhecida, com marca/cadeia indicada** — entram mais tarde, sem presumir que são grandes.
-5. **Empresas comprovadamente com 50 ou mais trabalhadores são excluídas** deste funil, independentemente do setor ou da localização.
+A seleção segue sempre esta **hierarquia lexicográfica**, sem deixar que pontos secundários ultrapassem prioridades superiores:
 
-A dimensão é registada apenas quando existe `DIMENSAO_VERIFICADA=N` acompanhada de `FONTE_DIMENSAO=https://...` nas notas do CRM e verificação humana. O OpenStreetMap raramente apresenta colaboradores, pelo que a maioria dos candidatos encontrados automaticamente permanece **por confirmar**. A ausência de marca não constitui prova de pequena dimensão.
+1. **Dimensão comprovada** — microempresa (1–9), pequena empresa (10–49), dimensão desconhecida independente/sem marca conhecida, dimensão desconhecida com sinal de cadeia. Excluir se houver prova de 50 ou mais trabalhadores. A ausência de trabalhadores conhecidos não equivale a grande empresa nem a microempresa.
+2. **Cidade e tipo de zona** — primeiro subúrbios, depois localidades regionais/cidades de menor dimensão, por último centros do Porto/Lisboa. A rotação diária pesquisa 3 zonas suburbanas do Porto, 2 de Lisboa, 2 regionais e 1 centro. Dentro do mesmo nível diversificam-se os concelhos.
+3. **CAE oficial ou setor de atividade** — se `CAE_VERIFICADO=XXXXX` e `FONTE_CAE=https://...` constam das notas, usa-se o CAE. Prioridade alta: divisões 46 (comércio por grosso), 68 (imobiliário), 69 (contabilidade e serviços jurídicos). Prioridade média: serviços empresariais, construção, logística, informática e comércio especializado. Prioridade baixa: restantes setores com potencial empresarial. Excluídos apenas CAEs **verificados** das divisões 84, 92, 97, 98 e 99, por estarem fora deste funil. Caso contrário usa-se `office`, `shop` ou `craft` do OpenStreetMap como **aproximação de setor, não como CAE oficial**.
+4. **Qualidade do contacto** — consistência do email com o domínio oficial, fonte pública, duplicados, atualidade. Emails genéricos de domínio empresarial são pré-requisito da pesquisa automática atual; endereços pessoais ou webmail não são enviados pelo Resend.
 
-**Somente dentro de cada nível de dimensão** aplicam-se os fatores secundários:
-- Setor: 1.º contabilidade, imobiliário e distribuição; 2.º serviços empresariais, ofícios, comércio especializado e áreas operacionais adjacentes; 3.º restantes atividades compatíveis com as pesquisas.
-- Localização: 1.º subúrbios; 2.º cidades regionais; 3.º centros Porto/Lisboa.
-- Consistência do domínio do email com o website oficial, que exige sempre revisão posterior.
+A pesquisa OSM foi alargada aos diferentes tipos de `office`, `shop` e `craft` que tenham email público. O motor preenche primeiro a quota com candidatos de prioridade superior e **desce progressivamente** à prioridade seguinte quando não encontra volume suficiente. Isto alarga a descoberta, nunca a elegibilidade legal ou contratual do fornecedor.
 
-A seleção tenta primeiro o setor mais relevante dentro do nível de dimensão; quando faltam candidatos, aceita os setores secundários e só depois os terciários. **Nunca** promove uma empresa sem dimensão confirmada à frente de uma micro/pequena verificada só porque a sua cidade ou CAE aproximado tem pontuação superior.
+**A dimensão pode ser documentada:** `DIMENSAO_VERIFICADA=N; FONTE_DIMENSAO=https://...`. Estas marcas exigem verificação humana e origem identificada. O OpenStreetMap raramente inclui número de trabalhadores. Não inventar dimensão ou CAE nem tratar ausência de marca como prova de independência.
 
-O score 0–100 é auxiliar e não determina a ordem principal. O setor OSM é uma categoria indicativa, **não um CAE oficial**; CAE e nº de trabalhadores exigem fontes empresariais verificáveis.
+**O envio de amanhã, 12/11/2026, está agendado para 09:30 UTC** no workflow `outreach-legal.yml`, tal como as futuras quintas-feiras/dias úteis. Envia no máximo cinco emails por dia, mas **só para destinatários com consentimento documentado e aprovação explícita** na aba `Revisão Comercial`. Se nenhum destinatário cumprir os critérios, o resultado correto é zero envios. Consultar a política do Resend: https://resend.com/legal/acceptable-use . O cron do GitHub pode executar com atraso e não garante a hora ao minuto.
 
 ## Segurança, deduplicação e limites
 Deduplicação por email, domínio, identificador de origem OSM e nome+localidade; o motor reconfirma antes de cada escrita. Até **15 novas linhas/dia**, com **máximo 5 por zona** na seleção inicial. Não se faz scraping ao Google Maps nem se usa uma base comercial paga sem licença. O OSM é um ponto de partida, não uma validação completa.
