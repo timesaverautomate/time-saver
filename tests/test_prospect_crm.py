@@ -216,14 +216,14 @@ class ProspectCrmTests(unittest.TestCase):
         row = crm.candidate(sample(), "Porto")
         day = "2026-11-10"
         row[16] = "OSM público; " + crm.AUTO_MARKER + day
-        self.assertEqual(crm.daily_remaining([row] * 29, day), 1)
-        self.assertEqual(crm.daily_remaining([row] * 30, day), 0)
-        self.assertEqual(crm.daily_remaining([row] * 30, "2026-11-11"), 30)
+        self.assertEqual(crm.daily_remaining([row] * (crm.MAX_DAILY_WRITES - 1), day), 1)
+        self.assertEqual(crm.daily_remaining([row] * crm.MAX_DAILY_WRITES, day), 0)
+        self.assertEqual(crm.daily_remaining([row] * crm.MAX_DAILY_WRITES, "2026-11-11"), crm.MAX_DAILY_WRITES)
 
     def test_prepare_daily_limited_and_uncontactable(self):
         day = "2026-11-10"
         older = []
-        for i in range(29):
+        for i in range(crm.MAX_DAILY_WRITES - 1):
             old = crm.candidate(sample(name=f"Antiga {i}", email=f"info@old{i}.pt", osm_id=i + 100), "Porto")
             old[3] = f"https://old{i}.pt"
             old[16] = "OSM público; " + crm.AUTO_MARKER + day
@@ -270,6 +270,67 @@ class ProspectCrmTests(unittest.TestCase):
     def test_read_header_contract(self):
         self.assertEqual(len(crm.HEADERS), 26)
         self.assertEqual(crm.HEADERS[24], "Não contactar")
+
+
+    def test_geographic_plan_rotates_and_prioritizes_suburbs(self):
+        today = crm.search_plan("2026-11-11")
+        tomorrow = crm.search_plan("2026-11-12")
+        self.assertEqual(len(today), 8)
+        self.assertEqual([z[4] for z in today].count("suburbio"), 5)
+        self.assertEqual([z[4] for z in today].count("regional"), 2)
+        self.assertEqual([z[4] for z in today].count("centro"), 1)
+        self.assertNotEqual([z[0] for z in today], [z[0] for z in tomorrow])
+        self.assertEqual(today, crm.search_plan("2026-11-11"))
+        self.assertTrue(all(1500 <= z[3] <= 3000 for z in today))
+
+    def test_suburban_score_is_evidence_based_and_location_cautious(self):
+        metro = crm.candidate(sample(osm_id=400), "Porto", "centro")
+        suburb = crm.candidate(sample(osm_id=401), "Maia", "suburbio")
+        self.assertEqual(suburb[2], "Área de Maia (aproximada)")
+        self.assertIn("Município não confirmado", suburb[16])
+        self.assertIn("TIPO_ZONA=suburbio", suburb[16])
+        self.assertGreater(crm.prospect_score(suburb), crm.prospect_score(metro))
+        self.assertNotIn("DIMENSAO_VERIFICADA", suburb[16])
+        with_evidence = list(suburb)
+        with_evidence[16] += "; DIMENSAO_VERIFICADA=9"
+        self.assertEqual(crm.prospect_score(with_evidence) - crm.prospect_score(suburb), 15)
+        branded = sample(osm_id=402)
+        branded["tags"]["brand"] = "Franquia hipotética"
+        chain = crm.candidate(branded, "Maia", "suburbio")
+        self.assertLess(crm.prospect_score(chain), crm.prospect_score(suburb))
+        exact = sample(osm_id=403)
+        exact["tags"]["addr:city"] = "Valongo"
+        self.assertEqual(crm.candidate(exact, "Maia", "suburbio")[2], "Valongo")
+
+    def test_no_website_kept_for_manual_research_not_sending(self):
+        business = sample(osm_id=600)
+        business["tags"].pop("website")
+        row = crm.candidate(business, "Espinho", "regional")
+        self.assertIsNotNone(row)
+        self.assertEqual(row[3], "")
+        self.assertEqual(row[24], "Sim")
+        self.assertIn("sem website", row[16])
+        review = crm.review_row(row, 2)
+        self.assertFalse(crm.evaluate_send_eligibility(row, review)[0])
+
+    def test_balanced_selection_is_round_robin(self):
+        self.assertEqual(crm.balanced_candidates(
+            [["porto1", "porto2", "porto3"], ["lisboa1", "lisboa2"], ["regiao1"]], 5
+        ), ["porto1", "lisboa1", "regiao1", "porto2", "lisboa2"])
+        self.assertEqual(crm.balanced_candidates([], 15), [])
+
+    def test_deduplication_across_search_areas(self):
+        base = crm.candidate(sample(osm_id=700), "Porto", "centro")
+        other = crm.candidate(sample(name="Empresa com nova denominação", osm_id=701),
+                              "Maia", "suburbio")
+        self.assertTrue(crm.is_duplicate(other, crm.existing_keys([base])))
+        other[4] = "info@outraempresa.pt"
+        other[3] = "https://outraempresa.pt"
+        self.assertFalse(crm.is_duplicate(other, crm.existing_keys([base])))
+
+    def test_daily_discovery_quota_is_cautious(self):
+        self.assertEqual(crm.MAX_DAILY_WRITES, 15)
+        self.assertEqual(crm.MAX_PER_ZONE, 5)
 
 
 if __name__ == "__main__":
