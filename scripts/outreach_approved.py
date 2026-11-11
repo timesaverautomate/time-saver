@@ -111,6 +111,12 @@ def select_approved(crm_rows, reviews, today=None, limit=MAX_OUTREACH_PER_DAY):
         if text_cell(review, 2) != text_cell(row, 2):
             reasons["Localidade da revisão divergente"] += 1
             continue
+        # Empresas comprovadamente com 50 ou mais trabalhadores ficam fora
+        # deste funil; dimensões desconhecidas seguem para análise, não
+        # são classificadas artificialmente como pequenas.
+        if crm.size_priority(row) is None:
+            reasons["Empresa acima do limite de dimensão (50+)"] += 1
+            continue
         allowed, reason = crm.evaluate_send_eligibility(row, review, suppression, today=today)
         if not allowed:
             reasons[reason] += 1
@@ -132,7 +138,7 @@ def select_approved(crm_rows, reviews, today=None, limit=MAX_OUTREACH_PER_DAY):
         selected.append((line, row, review))
         batch_emails.add(email)
         batch_domains.add(business_domain)
-    selected.sort(key=lambda x: crm.prospect_score(x[1]), reverse=True)
+    selected.sort(key=lambda x: crm.lead_priority_key(x[1]))
     return selected[:limit], reasons
 
 
