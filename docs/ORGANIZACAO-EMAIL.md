@@ -6,7 +6,7 @@ A caixa central é `timesaverautomate@gmail.com`; a folha CRM regista o estado c
 
 | Etiqueta | Utilização |
 | --- | --- |
-| `01 Pedidos do sítio` | Pedidos recebidos pelo formulário. Entram na caixa de entrada para análise e resposta. |
+| `01 Pedidos do site` | Pedidos recebidos pelo formulário. Entram na caixa de entrada para análise e resposta. |
 | `02 Aguardar resposta` | Conversas em que a Time Saver já respondeu e aguarda esclarecimentos ou decisão. |
 | `03 Clientes e projetos` | Correspondência de projetos aprovados e em curso. |
 | `04 Agenda` | Confirmações, alterações e cancelamentos do Calendly. |
@@ -20,7 +20,7 @@ A caixa central é `timesaverautomate@gmail.com`; a folha CRM regista o estado c
 
 ## Percurso diário
 
-1. Um pedido novo fica na caixa de entrada e recebe a etiqueta `01 Pedidos do sítio`.
+1. Um pedido novo fica na caixa de entrada e recebe a etiqueta `01 Pedidos do site`.
 2. Após analisar, responder ou pedir esclarecimentos, atualizar a próxima ação na folha CRM.
 3. Se a ação seguinte for do cliente, aplicar `02 Aguardar resposta` e usar **Adiar** no Gmail até à data escolhida para rever o assunto.
 4. Quando houver aprovação, aplicar `03 Clientes e projetos` e manter o estado comercial na folha.
@@ -36,7 +36,7 @@ Para identificar pedidos do formulário, testar primeiro no campo de pesquisa do
 from:pedidos@timesaverautomate.com subject:"Time Saver — Novo pedido de orçamento"
 ```
 
-Depois criar um filtro que aplique `01 Pedidos do sítio` e os mantenha na caixa de entrada. Manter a proteção de spam do Gmail ativa. Um remetente visível não substitui a autenticação da mensagem.
+Depois criar um filtro que aplique `01 Pedidos do site` e os mantenha na caixa de entrada. Manter a proteção de spam do Gmail ativa. Um remetente visível não substitui a autenticação da mensagem.
 
 Os novos pedidos mostram o nome no início e uma referência única no fim do assunto. Exemplo: `Maria Silva — Time Saver — Novo pedido de orçamento — TS-…`. Mesmo dois pedidos do mesmo nome têm referências e assuntos diferentes. O texto fixo antigo permanece no assunto, pelo que os filtros anteriores continuam compatíveis.
 
