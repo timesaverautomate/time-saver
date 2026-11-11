@@ -444,7 +444,7 @@ def evaluate_send_eligibility(crm_row, review_row, suppressed_emails=(), today=N
     today = today or datetime.now(ZoneInfo("Europe/Lisbon")).date()
     email = value(crm_row, 4).lower()
     website = value(crm_row, 3)
-    if value(crm_row, 24).casefold() == "sim":
+    if norm(value(crm_row, 24)) != "nao":
         return False, "Bloqueio Não contactar no CRM"
     if value(review_row, 8) != "Verificado":
         return False, "Revisão não concluída"
