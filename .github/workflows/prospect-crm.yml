@@ -18,6 +18,8 @@ on:
       - 'tests/test_prospect_crm.py'
       - 'scripts/resend_events.py'
       - 'tests/test_resend_events.py'
+      - 'scripts/resend_webhook.py'
+      - 'tests/test_resend_webhook.py'
 permissions:
   contents: read
 concurrency:
@@ -34,7 +36,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Instalar dependencias
-        run: pip install google-auth requests
+        run: pip install google-auth requests flask svix
       - name: Testes de seguranca sem pesquisa ou escrita
         run: python -m unittest discover -s tests -p 'test_*.py' -v
   pesquisar:
@@ -47,7 +49,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Instalar dependencias
-        run: pip install google-auth requests
+        run: pip install google-auth requests flask svix
       - name: Testes de seguranca do CRM
         run: python -m unittest discover -s tests -p 'test_*.py' -v
       - name: Pesquisa ou simulação Resend (sem envios)
