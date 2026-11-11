@@ -578,7 +578,9 @@ def unique_send_candidates(rows):
     """Um único destinatário por execução, independentemente do número de empresas."""
     seen = set()
     unique = []
-    for score, row in sorted(rows, key=lambda pair: pair[0], reverse=True):
+    for score, row in sorted(
+        rows, key=lambda pair: (lead_priority_key(pair[1]), -pair[0])
+    ):
         email = str(row[4]).strip().lower()
         if email in seen:
             continue
