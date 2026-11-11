@@ -76,7 +76,7 @@ def candidate(element, city):
     row = [""] * len(HEADERS)
     website = str(tags.get("website") or tags.get("contact:website") or "").strip()
     row[0] = name[:180]
-    row[1] = str(tags.get("shop") or "Empresa")[:70]
+    row[1] = str(tags.get("shop") or tags.get("office") or "Empresa")[:70]
     row[2] = city
     row[3] = website[:400] if domain(website) else ""
     row[4] = email
@@ -213,9 +213,12 @@ def find_candidates(existing, limit):
         if len(candidates) >= limit:
             break
         query = (
-            '[out:json][timeout:35];(nwr(around:12000,'
-            f'{lat},{lon})["shop"~"^(computer|electronics|mobile_phone|'
-            'office_supplies|hardware|pet|furniture)$"]["name"];);out tags 250;'
+            '[out:json][timeout:35];('
+            f'nwr(around:12000,{lat},{lon})'
+            '["shop"~"^(computer|electronics|mobile_phone|office_supplies|hardware|pet|furniture)$"]["name"];'
+            f'nwr(around:12000,{lat},{lon})'
+            '["office"~"^(accountant|insurance|estate_agent|consulting|company)$"]["name"];'
+            ');out tags 350;'
         )
         elements = None
         for endpoint in ENDPOINTS:
