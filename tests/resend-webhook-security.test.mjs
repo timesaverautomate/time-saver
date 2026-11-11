@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import webhook, { verifySvix, verifySvixDetailed, readWebhookBody, WebhookBodyError, planCrmEvent } from '../workers/resend-webhook.js';
+import webhook, { verifySvix, verifySvixDetailed, readWebhookBody, WebhookBodyError, planCrmEvent, writePlannedCrmCells } from '../workers/resend-webhook.js';
 
 const NOW = 1794384000000;
 const SECRET = 'whsec_' + btoa('synthetic-webhook-key-for-tests!!');
@@ -215,4 +215,17 @@ test('webhook fails closed without coordinator binding', async t => {
  const res=await webhook.fetch(await requestFor(body),{RESEND_WEBHOOK_SECRET:SECRET});
  assert.equal(res.status,503);
  assert.deepEqual(await res.json(),{error:'coordinator_unavailable'});
+});
+
+test('CRM write adapter rejects unsafe ranges without contacting Google', async () => {
+ const forbidden = [
+   [{range:"'Pedidos'!A2",values:[['changed']]}],
+   [{range:"'Pedidos'!Y2",values:[['Não']]}],
+   [{range:"'Pedidos'!V1",values:[['Entregue']]}],
+   [{range:"'Pedidos'!V2",values:[['Entregue']]},{range:"'Pedidos'!Y3",values:[['Sim']]}],
+   [{range:"'Pedidos'!V2",values:[['Entregue']]},{range:"'Pedidos'!V2",values:[['Bounce']]}],
+ ];
+ for(const updates of forbidden)
+   await assert.rejects(writePlannedCrmCells("not-a-key",updates,()=>{throw Error("network_called")}),/invalid_crm_updates/);
+ assert.deepEqual(await writePlannedCrmCells("not-a-key",[]),{written_cells:0});
 });
