@@ -172,7 +172,7 @@ def candidate(element, city, zone_type="centro"):
     row = [""] * len(HEADERS)
     website = str(tags.get("website") or tags.get("contact:website") or "").strip()
     row[0] = name[:180]
-    row[1] = str(tags.get("shop") or tags.get("office") or "Empresa")[:70]
+    row[1] = str(tags.get("shop") or tags.get("office") or tags.get("craft") or "Empresa")[:70]
     # Não inventar o município: uma pesquisa radial pode atravessar concelhos.
     municipality = str(tags.get("addr:city") or "").strip()
     row[2] = (municipality[:100] if municipality else
@@ -330,56 +330,95 @@ REVIEW_HEADERS = [
 
 
 
-def prospect_score(row):
-    """0-100, exclusivamente sinais observáveis; NUNCA autoriza contacto.
+# A dimensão tem precedência sobre setor, região e qualidade do email.
+# Só as anotações revistas com fonte documentada confirmam colaboradores.
+SIZE_EVIDENCE = re.compile(r"\bDIMENSAO_VERIFICADA=(\d{1,5})\b")
+SIZE_SOURCE = re.compile(r"\bFONTE_DIMENSAO=https?://[^\s;]+")
 
-    Dimensão desconhecida vale 0 pontos nesse critério, não significa empresa grande.
-    Os valores adicionais DIMENSAO_VERIFICADA e PROCESSO_VALIDADO são revisão humana.
-    """
-    sector = norm(row[1] if len(row) > 1 else "")
-    website = str(row[3]) if len(row) > 3 else ""
-    email = str(row[4]).strip().lower() if len(row) > 4 else ""
+
+def verified_employees(row):
+    """Número de trabalhadores, apenas quando há marcação E fonte da revisão."""
     notes = str(row[16]) if len(row) > 16 else ""
-    score = 0
-    # Adequação a serviços que conseguimos entregar.
+    count = SIZE_EVIDENCE.search(notes)
+    if not count or not SIZE_SOURCE.search(notes):
+        return None
+    employees = int(count.group(1))
+    return employees if employees >= 1 else None
+
+
+def size_priority(row):
+    """0=micro, 1=pequena, 2=dimensão desconhecida, 3=marca/cadeia sem prova.
+
+    None representa empresa de dimensão comprovada >=50: fora da prospeção.
+    A ausência de indicação de marca NÃO comprova independência nem dimensão.
+    """
+    count = verified_employees(row)
+    if count is not None:
+        if count < 10:
+            return 0
+        if count < 50:
+            return 1
+        return None
+    notes = str(row[16]) if len(row) > 16 else ""
+    return 3 if "Marca referida no OSM" in notes else 2
+
+
+def sector_priority(row):
+    """Grupos de oportunidade, não códigos CAE oficiais."""
+    sector = norm(row[1] if len(row) > 1 else "")
     if sector in {"accountant", "estate_agent", "wholesale", "trade"} or any(
         word in sector for word in ("contab", "imobili", "distribu")
     ):
-        score += 35
-    elif sector in {"consulting", "insurance", "logistics", "company"}:
-        score += 25
-    elif sector in {"office_supplies", "hardware", "computer", "electronics"}:
-        score += 15
-    else:
-        score += 5
-    # Preferência por zonas menos saturadas; nunca afirmar que a empresa é pequena.
+        return 0
+    if sector in {
+        "consulting", "insurance", "logistics", "company", "lawyer",
+        "architect", "employment_agency", "financial", "administrative",
+        "building", "carpenter", "electrician", "plumber", "hvac",
+        "office_supplies", "computer", "hardware", "electronics", "furniture",
+        "car_parts", "stationery", "pet",
+    }:
+        return 1
+    return 2
+
+
+def geography_priority(row):
+    notes = str(row[16]) if len(row) > 16 else ""
     if "TIPO_ZONA=suburbio" in notes:
-        score += 25
-    elif "TIPO_ZONA=regional" in notes:
-        score += 20
-    elif "TIPO_ZONA=centro" in notes:
-        score += 5
-    # Contacto técnico observável; não substitui a verificação da titularidade.
-    if EMAIL_RE.fullmatch(email):
-        email_domain = email.rsplit("@", 1)[-1]
-        if domain(website) and email_domain == domain(website):
-            score += 20
-        elif domain(website):
-            score += 5
-    # Evidência adicional só após verificação explícita (nunca deduzida do setor).
-    size = re.search(r"\bDIMENSAO_VERIFICADA=(\d{1,5})\b", notes)
-    if size:
-        employees = int(size.group(1))
-        if 1 <= employees <= 20:
-            score += 15
-        elif employees <= 50:
-            score += 8
-    if "PROCESSO_VALIDADO=Sim" in notes:
-        score += 5
-    # Marca/franquia não prova grande dimensão, mas pede análise adicional.
-    if "Marca referida no OSM" in notes:
-        score -= 10
-    return max(0, min(100, score))
+        return 0
+    if "TIPO_ZONA=regional" in notes:
+        return 1
+    return 2
+
+
+def lead_priority_key(row):
+    """Prioridade LEXICOGRÁFICA: dimensão > setor > localização > contacto.
+
+    Nunca permitir que um CAE ou uma capital com score alto ultrapasse uma
+    micro/pequena empresa com dimensão efetivamente verificada.
+    """
+    size = size_priority(row)
+    if size is None:
+        return (99, 99, 99, 99)
+    website = str(row[3]) if len(row) > 3 else ""
+    email = str(row[4]).strip().lower() if len(row) > 4 else ""
+    match = int(bool(domain(website) and email.endswith("@" + domain(website))))
+    return (size, sector_priority(row), geography_priority(row), -match)
+
+
+def prospect_score(row):
+    """Score explicativo; a ordem de pesquisa usa lead_priority_key."""
+    size = size_priority(row)
+    if size is None:
+        return 0
+    sector_points = {0: 25, 1: 15, 2: 5}[sector_priority(row)]
+    zone_points = {0: 10, 1: 6, 2: 2}[geography_priority(row)]
+    size_points = {0: 50, 1: 45, 2: 10, 3: 0}[size]
+    website = str(row[3]) if len(row) > 3 else ""
+    email = str(row[4]).strip().lower() if len(row) > 4 else ""
+    contact_points = 10 if domain(website) and email.endswith("@" + domain(website)) else 0
+    notes = str(row[16]) if len(row) > 16 else ""
+    process_points = 5 if "PROCESSO_VALIDADO=Sim" in notes else 0
+    return min(100, size_points + sector_points + zone_points + contact_points + process_points)
 
 
 def proposal_content(row, verified_hook=""):
@@ -499,7 +538,7 @@ def review_row(crm_row, line_number):
          "Sem website identificado" if not domain(cell(3)) else
          "Domínio coincide (não verificado)" if cell(4).rsplit("@", 1)[-1].lower() == domain(cell(3))
          else "Domínios diferentes (rever)"),
-        "Por verificar", "", f"Score comercial: {prospect_score(crm_row)}/100 (sem validar dimensão); " + draft_proposal(crm_row), str(line_number),
+        "Por verificar", "", f"Dimensão: {'micro verificada' if size_priority(crm_row) == 0 else 'pequena verificada' if size_priority(crm_row) == 1 else 'por confirmar'}; Score comercial: {prospect_score(crm_row)}/100; " + draft_proposal(crm_row), str(line_number),
         "", "", "", "", "", "", "",
     ]
 
@@ -655,6 +694,28 @@ def balanced_candidates(groups, limit):
     return selected
 
 
+def prioritized_candidates(groups, limit):
+    """Preencher primeiro com os menores, depois diminuir a exigência setorial.
+
+    Diversificar localizações *dentro* de cada nível; a distribuição geográfica
+    nunca tem precedência sobre uma micro/pequena empresa verificada.
+    """
+    ranked = sorted({
+        lead_priority_key(row)[:2]
+        for group in groups for row in group if size_priority(row) is not None
+    })
+    output = []
+    for rank in ranked:
+        tier_groups = [
+            [row for row in group if lead_priority_key(row)[:2] == rank]
+            for group in groups
+        ]
+        output.extend(balanced_candidates(tier_groups, limit - len(output)))
+        if len(output) >= limit:
+            break
+    return output
+
+
 def find_candidates(existing, limit, day=None):
     seen = existing_keys(existing)
     groups = []
@@ -672,14 +733,19 @@ def find_candidates(existing, limit, day=None):
         lat_delta = radius / 111_320
         lon_delta = radius / (111_320 * max(0.2, math.cos(math.radians(lat))))
         bbox = f"{lat-lat_delta:.5f},{lon-lon_delta:.5f},{lat+lat_delta:.5f},{lon+lon_delta:.5f}"
-        offices = "^(accountant|estate_agent|consulting|insurance|company|logistics)$"
-        shops = "^(wholesale|trade|office_supplies|computer|hardware|electronics|pet)$"
+        # O setor limita apenas os negócios obviamente alheios aos serviços;
+        # primeiro procura-se micro/pequenas e depois alarga-se a outras áreas.
+        offices = "^(accountant|estate_agent|consulting|insurance|company|logistics|lawyer|architect|employment_agency|financial|administrative)$"
+        shops = "^(wholesale|trade|office_supplies|computer|hardware|electronics|pet|furniture|car_parts|stationery)$"
+        crafts = "^(carpenter|electrician|plumber|hvac)$"
         query = (
             "[out:json][timeout:20];("
             f'nwr({bbox})["office"~"{offices}"]["name"]["contact:email"];'
             f'nwr({bbox})["office"~"{offices}"]["name"]["email"];'
             f'nwr({bbox})["shop"~"{shops}"]["name"]["contact:email"];'
             f'nwr({bbox})["shop"~"{shops}"]["name"]["email"];'
+            f'nwr({bbox})["craft"~"{crafts}"]["name"]["contact:email"];'
+            f'nwr({bbox})["craft"~"{crafts}"]["name"]["email"];'
             ");out tags 250;"
         )
         elements = None
@@ -710,10 +776,10 @@ def find_candidates(existing, limit, day=None):
         local = []
         for element in elements:
             row = candidate(element, city, kind)
-            if row is not None and not is_duplicate(row, seen):
+            if row is not None and size_priority(row) is not None and not is_duplicate(row, seen):
                 local.append(row)
         # A fonte não devolve os elementos por potencial comercial.
-        local.sort(key=prospect_score, reverse=True)
+        local.sort(key=lead_priority_key)
         group = []
         for row in local:
             if is_duplicate(row, seen):
@@ -725,7 +791,7 @@ def find_candidates(existing, limit, day=None):
         groups.append(group)
         print(f"Zona {city}: {len(group)} candidatos novos para triagem.", flush=True)
         time.sleep(1)
-    candidates = balanced_candidates(groups, limit)
+    candidates = prioritized_candidates(groups, limit)
     print(f"Consultas com sucesso: {successful}; falhas: {failed}", flush=True)
     print(f"Candidatos encontrados (diversidade geográfica): {len(candidates)}", flush=True)
     if successful == 0:
@@ -741,8 +807,10 @@ def prepare_rows_for_write(latest, candidates, limit, day=None):
         return []
     keys = existing_keys(latest)
     fresh = []
-    for source in candidates:
+    for source in sorted(candidates, key=lead_priority_key):
         row = list(source)
+        if size_priority(row) is None:
+            continue
         if is_duplicate(row, keys):
             continue
         if len(row) != 26 or row[24] != "Sim" or row[23] != "Por avaliar":
