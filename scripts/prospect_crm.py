@@ -186,7 +186,7 @@ def google_credentials():
 
 def read_rows(credentials):
     response = requests.get(
-        f"{API}/values/{quote(chr(39) + 'Empresas' + chr(39) + '!A1:Z10000', safe='')}",
+        f"{API}/values/{quote(chr(39) + 'Pedidos' + chr(39) + '!A1:Z10000', safe='')}",
         headers={"Authorization": "Bearer " + credentials.token},
         timeout=30,
     )
@@ -296,7 +296,7 @@ def write_candidates(credentials, candidates, limit, mode, day=None):
         print("Quota esgotada ou contactos existentes; zero linhas adicionadas.")
         return 0
     response = requests.post(
-        f"{API}/values/Empresas%21A%3AZ:append",
+        f"{API}/values/Pedidos%21A%3AZ:append",
         params={"valueInputOption": "RAW", "insertDataOption": "INSERT_ROWS"},
         headers={"Authorization": "Bearer " + credentials.token},
         json={"values": fresh},
