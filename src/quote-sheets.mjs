@@ -12,6 +12,9 @@ const TOKEN='https://oauth2.googleapis.com/token';
 const QUOTE_TAB='Pedidos do Site';
 const MARKER_KEY='tq';
 const MAX_MARKER_CANDIDATES=8;
+// Fórmula controlada pela aplicação: ROW() mantém o estado associado à linha
+// mesmo quando é movida. Conteúdo dos visitantes continua sempre stringValue.
+export const QUOTE_STATUS_FORMULA='=IF(INDEX(R:R;ROW())="";"Pendente envio";"Novo")';
 
 function b64url(input){
   return btoa(input).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -106,6 +109,32 @@ export async function quoteMetadataId(reference,candidate=0){
     'time-saver-quote-marker-v1:'+QUOTE_SHEET_ID+':'+reference+':'+candidate));
   return (new DataView(digest).getUint32(0,false)&0x7fffffff)||1;
 }
+export function quoteInsertRequests(sheetId,row,metadataId,reference){
+  if(!Number.isInteger(sheetId)||sheetId<0||!Number.isInteger(metadataId)||metadataId<=0||metadataId>0x7fffffff
+    ||!/^TS-[A-F0-9]{20}$/.test(reference)||!Array.isArray(row)||row.length!==QUOTE_HEADERS.length
+    ||row.some(value=>typeof value!=='string'))throw Error('sheets_insert_invalid');
+  const values=row.map(value=>({userEnteredValue:{stringValue:value}}));
+  values[14]={userEnteredValue:{formulaValue:QUOTE_STATUS_FORMULA}};
+  return [
+    {insertDimension:{range:{sheetId,dimension:'ROWS',startIndex:1,endIndex:2},inheritFromBefore:false}},
+    {updateCells:{start:{sheetId,rowIndex:1,columnIndex:0},rows:[{values}],fields:'userEnteredValue'}},
+    {createDeveloperMetadata:{developerMetadata:{metadataId,metadataKey:MARKER_KEY,
+      location:{dimensionRange:{sheetId,dimension:'ROWS',startIndex:1,endIndex:2}},visibility:'DOCUMENT'}}}
+  ];
+}
+export function quoteRowFilter(metadataId){
+  if(!Number.isInteger(metadataId)||metadataId<=0||metadataId>0x7fffffff)
+    throw Error('sheets_metadata_invalid');
+  return {developerMetadataLookup:{metadataId,metadataKey:MARKER_KEY,
+    locationType:'ROW',visibility:'DOCUMENT'}};
+}
+function validRowMarker(marker,sheetId){
+  const range=marker?.location?.dimensionRange;
+  return marker?.metadataKey===MARKER_KEY&&(marker.metadataValue===undefined||marker.metadataValue==='')&&marker.visibility==='DOCUMENT'
+    &&Number.isInteger(marker.metadataId)&&marker.metadataId>0&&marker.metadataId<=0x7fffffff
+    &&range?.sheetId===sheetId&&range.dimension==='ROWS'&&Number.isInteger(range.startIndex)
+    &&range.startIndex>=1&&range.endIndex===range.startIndex+1;
+}
 function existingQuote(all,data,reference,access){
   const matches=all.map((row,index)=>index>0&&row[0]===reference?index:-1).filter(index=>index>0);
   if(matches.length>1)throw Error('sheets_duplicate_or_missing');
@@ -117,7 +146,10 @@ function existingQuote(all,data,reference,access){
   return {access,reference,rowNumber:index+1,status:row[14]||'',duplicate:true};
 }
 async function quoteSheetId(access,fetcher){
-  const result=await sheetCall(ROOT+'?fields=sheets(properties(sheetId,title))',access,fetcher);
+  const result=await sheetCall(ROOT+'?fields=properties(locale),sheets(properties(sheetId,title))',access,fetcher);
+  // A fórmula foi comprovada para este livro pt_PT. Recusar novas inserções se
+  // a configuração do proprietário mudar, em vez de criar estados #ERROR!.
+  if(result?.properties?.locale!=='pt_PT')throw Error('sheets_locale_mismatch');
   if(!Array.isArray(result.sheets))throw Error('sheets_sheet_mismatch');
   const matches=result.sheets.map(sheet=>sheet.properties).filter(properties=>properties?.title===QUOTE_TAB);
   const id=matches[0]?.sheetId;
@@ -140,15 +172,10 @@ export async function storeQuote(env,data,reference,received,{
   for(let candidate=0;candidate<MAX_MARKER_CANDIDATES;candidate++){
     const id=await metadataId(reference,candidate);
     if(!Number.isInteger(id)||id<=0||id>0x7fffffff)throw Error('sheets_metadata_invalid');
-    // Sheets aplica o marcador único e a linha no mesmo batch atómico. Um ID já
-    // ocupado faz falhar o batch inteiro, sem acrescentar outra linha. O marcador
-    // não contém nome, email ou descrição, não expira e não é removido pela aplicação.
-    const requests=[
-      {createDeveloperMetadata:{developerMetadata:{metadataId:id,metadataKey:MARKER_KEY,
-        location:{sheetId},visibility:'DOCUMENT'}}},
-      {appendCells:{sheetId,rows:[{values:row.map(value=>({userEnteredValue:{stringValue:String(value)}}))}],
-        fields:'userEnteredValue'}}
-    ];
+    // Inserção, conteúdo e âncora da linha pertencem à mesma transação. Um ID
+    // ocupado recusa o batch completo; inserções concorrentes não mudam a âncora.
+    // O marcador compacto não guarda a referência nem dados pessoais.
+    const requests=quoteInsertRequests(sheetId,row,id,reference);
     let result;
     try{
       result=await sheetCall(ROOT+':batchUpdate',access,fetcher,{
@@ -170,12 +197,13 @@ export async function storeQuote(env,data,reference,received,{
       // O candidato seguinte é determinístico para todos os executores.
       continue;
     }
-    if(result?.replies?.[0]?.createDeveloperMetadata?.developerMetadata?.metadataId!==id)
+    const marker=result?.replies?.[2]?.createDeveloperMetadata?.developerMetadata;
+    if(marker?.metadataId!==id||!validRowMarker(marker,sheetId))
       throw Error('sheets_insert_unconfirmed');
     const verified=await rows(access,fetcher);
     const inserted=existingQuote(verified,data,reference,access);
     if(!inserted)throw Error('sheets_duplicate_or_missing');
-    return {...inserted,duplicate:false};
+    return {...inserted,duplicate:false,rowMetadataId:id};
   }
   throw Error('sheets_metadata_collision_limit');
 }
@@ -184,19 +212,40 @@ export async function markQuoteReceived(entry,providerId,{
 }={}){
   if(!entry||entry.status!=='Pendente envio')return;
   if(!/^TS-[A-F0-9]{20}$/.test(entry.reference||''))throw Error('quote_reference_invalid');
-  // Uma ordenação manual pode mudar a posição. Localizar novamente pela referência
-  // e preservar um estado que o utilizador já tenha atualizado entretanto.
-  const current=await rows(entry.access,fetcher);
-  const matches=current.map((r,i)=>i>0&&r[0]===entry.reference?i:-1).filter(i=>i>0);
-  if(matches.length!==1)throw Error('sheets_duplicate_or_missing');
-  const n=matches[0]+1;
-  if(current[n-1][14]!=='Pendente envio')return;
-  const iso=new Date().toISOString();
-  await sheetCall(ROOT+'/values:batchUpdate',entry.access,fetcher,{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({valueInputOption:'RAW',data:[
-      {range:"'Pedidos do Site'!O"+n,values:[['Novo']]},
-      {range:"'Pedidos do Site'!Q"+n+":R"+n,values:[[iso,String(providerId||'').slice(0,100)]]}
-    ]})
+  const ids=entry.rowMetadataId===undefined
+    ?await Promise.all(Array.from({length:MAX_MARKER_CANDIDATES},(_,candidate)=>quoteMetadataId(entry.reference,candidate)))
+    :[entry.rowMetadataId];
+  const filters=ids.map(id=>quoteRowFilter(id));
+  const checked=await sheetCall(ROOT+'/values:batchGetByDataFilter',entry.access,fetcher,{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataFilters:filters,majorDimension:'ROWS'})
   });
+  const ranges=checked?.valueRanges;
+  if(!Array.isArray(ranges)||ranges.length>MAX_MARKER_CANDIDATES)throw Error('sheets_row_marker_mismatch');
+  const matches=[];
+  for(const range of ranges){
+    const current=range?.valueRange?.values;
+    if(!Array.isArray(current)||current.length!==1||!Array.isArray(current[0]))throw Error('sheets_row_marker_mismatch');
+    if(current[0][0]!==entry.reference)continue; // ID de um candidato ocupado por outro pedido.
+    const address=range.valueRange.range,echoed=range.dataFilters;
+    if(typeof address!=='string'||!/^'Pedidos do Site'!A([2-9]|[1-9][0-9]+):[A-Z]+\1$/.test(address)
+      ||!Array.isArray(echoed)||echoed.length!==1)throw Error('sheets_row_marker_mismatch');
+    const id=echoed[0]?.developerMetadataLookup?.metadataId;
+    const filter=filters.find(value=>value.developerMetadataLookup.metadataId===id);
+    if(!filter||Object.entries(filter.developerMetadataLookup).some(([key,value])=>echoed[0].developerMetadataLookup[key]!==value))throw Error('sheets_row_marker_mismatch');
+    matches.push({current:current[0],filter});
+  }
+  // Linhas antigas sem âncora continuam legíveis/deduplicáveis, mas não recebem
+  // uma atualização por posição que poderia atingir outro pedido após ordenação.
+  if(matches.length!==1)throw Error('sheets_row_marker_missing');
+  const {current,filter}=matches[0];
+  if(current[14]!=='Pendente envio')return;
+  const iso=new Date().toISOString();
+  const values=Array(QUOTE_HEADERS.length).fill(null);values[16]=iso;values[17]=String(providerId||'').slice(0,100);
+  const updated=await sheetCall(ROOT+'/values:batchUpdateByDataFilter',entry.access,fetcher,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    // Null ignora a célula: nunca escrever O ou dados do pedido. Se o utilizador
+    // substituir a fórmula do estado por texto, a decisão manual é preservada.
+    body:JSON.stringify({valueInputOption:'RAW',data:[{dataFilter:filter,majorDimension:'ROWS',values:[values]}]})
+  });
+  if(updated?.totalUpdatedRows!==1||updated.totalUpdatedCells!==2)throw Error('sheets_status_unconfirmed');
 }

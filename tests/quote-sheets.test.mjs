@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {quoteSheetFixture} from './quote-sheet-fixture.mjs';
 import {QUOTE_HEADERS,quoteRow,storeQuote,markQuoteReceived} from '../src/quote-sheets.mjs';
 
 const REF='TS-0123456789ABCDEF0123';
@@ -10,44 +11,7 @@ const DATA={
   deadline:'Sem prazo definido',budget:'Até 500 €',
   description:'Descrição inventada para um teste isolado, sem email real.'
 };
-function fakeSheet(){
-  const values=[QUOTE_HEADERS.slice()];
-  const metadata=new Map();
-  let appends=0, updates=0;
-  async function fetcher(url,init={}){
-    const u=String(url);
-    if(u.endsWith(':batchUpdate')&&!u.endsWith('/values:batchUpdate')){
-      assert.equal(init.method,'POST');
-      const payload=JSON.parse(init.body);
-      const marker=payload.requests[0].createDeveloperMetadata.developerMetadata;
-      const append=payload.requests[1].appendCells;
-      if(metadata.has(marker.metadataId))return Response.json({error:{}},{status:400});
-      assert.equal(marker.metadataKey,'tq');assert.equal(marker.metadataValue,undefined);
-      assert.equal(append.sheetId,37);assert.equal(append.fields,'userEnteredValue');
-      metadata.set(marker.metadataId,marker);appends++;
-      values.push(...append.rows.map(row=>row.values.map(cell=>cell.userEnteredValue.stringValue)));
-      return Response.json({replies:[{createDeveloperMetadata:{developerMetadata:marker}},{}]});
-    }
-    if(u.endsWith('/values:batchUpdate')){
-      updates++;
-      assert.equal(JSON.parse(init.body).valueInputOption,'RAW');
-      const entries=JSON.parse(init.body).data;
-      const rowNumber=Number(entries[0].range.match(/O(\d+)/)?.[1]||0);
-      values[rowNumber-1][14]='Novo';
-      values[rowNumber-1][16]=entries[1].values[0][0];
-      values[rowNumber-1][17]=entries[1].values[0][1];
-      return Response.json({totalUpdatedRows:1});
-    }
-    if(u.includes('/developerMetadata/')){
-      const id=Number(u.split('/').at(-1));
-      return metadata.has(id)?Response.json(metadata.get(id)):Response.json({error:{}},{status:404});
-    }
-    if(u.includes('?fields='))return Response.json({sheets:[{properties:{sheetId:37,title:'Pedidos do Site'}}]});
-    if(u.includes('/values/')&&!u.includes(':append'))return Response.json({values});
-    throw Error('Unexpected mocked URL: '+u);
-  }
-  return {fetcher,values,stats:()=>({appends,updates})};
-}
+const fakeSheet=quoteSheetFixture;
 const options=(s)=>({fetcher:s.fetcher,authorize:async()=> 'test-token'});
 
 test('A linha respeita o cabeçalho e não executa fórmulas',()=>{

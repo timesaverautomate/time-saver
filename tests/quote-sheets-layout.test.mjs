@@ -1,52 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {quoteSheetFixture} from './quote-sheet-fixture.mjs';
 import {QUOTE_HEADERS,quoteRow,storeQuote,markQuoteReceived} from '../src/quote-sheets.mjs';
 
 const REF='TS-ABCDEF0123456789ABCD';
 const OTHER='TS-11111111111111111111';
 const DATA={name:'Exemplo fictício',email:'teste@example.invalid',company:'Teste',
   service:'Excel',description:'Dados fictícios exclusivos para testes sem rede.'};
-function fixture(){
-  const values=[QUOTE_HEADERS.slice()];
-  const metadata=new Map();
-  const formats={1:{foreground:'white'},2:{foreground:'black',wrap:true}};
-  const calls={append:0,update:0};
-  async function fetcher(raw,init={}){
-    const url=new URL(raw);
-    if(url.pathname.endsWith('/values:batchUpdate')){
-      calls.update++;
-      const updates=JSON.parse(init.body).data;
-      const n=Number(updates[0].range.match(/!O(\d+)$/)[1]);
-      values[n-1][14]=updates[0].values[0][0];
-      values[n-1][16]=updates[1].values[0][0];
-      values[n-1][17]=updates[1].values[0][1];
-      return Response.json({totalUpdatedRows:1});
-    }
-    if(url.pathname.endsWith(':batchUpdate')){
-      const requests=JSON.parse(init.body).requests;
-      const marker=requests[0].createDeveloperMetadata.developerMetadata;
-      const append=requests[1].appendCells;
-      if(metadata.has(marker.metadataId))return Response.json({error:{}},{status:400});
-      assert.equal(append.sheetId,37);assert.equal(append.fields,'userEnteredValue');
-      assert.equal(append.rows.length,1);assert.equal(append.rows[0].values.length,18);
-      assert.ok(append.rows[0].values.every(cell=>!('userEnteredFormat' in cell)&&typeof cell.userEnteredValue.stringValue==='string'));
-      metadata.set(marker.metadataId,marker);calls.append++;
-      values.push(append.rows[0].values.map(cell=>cell.userEnteredValue.stringValue));
-      return Response.json({replies:[{createDeveloperMetadata:{developerMetadata:marker}},{}]});
-    }
-    if(url.pathname.includes('/developerMetadata/')){
-      const id=Number(url.pathname.split('/').at(-1));
-      return metadata.has(id)?Response.json(metadata.get(id)):Response.json({error:{}},{status:404});
-    }
-    if(url.searchParams.has('fields')){
-      assert.equal(url.searchParams.get('fields'),'sheets(properties(sheetId,title))');
-      return Response.json({sheets:[{properties:{sheetId:37,title:'Pedidos do Site'}}]});
-    }
-    assert.equal(decodeURIComponent(url.pathname).split('/values/')[1],"'Pedidos do Site'!A1:R10000");
-    return Response.json({values});
-  }
-  return {values,calls,formats,fetcher,options:{fetcher,authorize:async()=> 'mock-token'}};
-}
+const fixture=quoteSheetFixture;
 
 test('append atómico só escreve valores no separador previsto e preserva formatos existentes',async()=>{
   const f=fixture();
@@ -70,7 +31,7 @@ test('repetir a mesma referência não acrescenta outra linha',async()=>{
 test('confirmação localiza a referência depois de uma ordenação da folha',async()=>{
   const f=fixture();
   const entry=await storeQuote({QUOTE_CRM_ENABLED:'true'},DATA,REF,Date.now(),f.options);
-  f.values.splice(1,0,quoteRow(DATA,OTHER,Date.now()));
+  f.insertAt(1,quoteRow(DATA,OTHER,Date.now()));
   await markQuoteReceived(entry,'mock-id',{fetcher:f.fetcher});
   assert.equal(f.values[1][0],OTHER);
   assert.equal(f.values[1][14],'Pendente envio');
@@ -86,4 +47,50 @@ test('confirmação não substitui um estado já alterado pelo utilizador',async
   await markQuoteReceived(entry,'mock-id',{fetcher:f.fetcher});
   assert.equal(f.values[1][14],'Em análise');
   assert.equal(f.calls.update,0);
+});
+
+test('ordenar depois da leitura não atribui o email a outro pedido',async()=>{
+  const f=quoteSheetFixture({onBeforeStatusUpdate:({reorder})=>reorder((a,b)=>b[0].localeCompare(a[0]))});
+  const entry=await storeQuote({QUOTE_CRM_ENABLED:'true'},DATA,REF,Date.now(),f.options);
+  await storeQuote({QUOTE_CRM_ENABLED:'true'},DATA,OTHER,Date.now(),f.options);
+  await markQuoteReceived(entry,'mock-reorder-id',{fetcher:f.fetcher});
+  const correct=f.values.find(row=>row[0]===REF),other=f.values.find(row=>row[0]===OTHER);
+  assert.equal(correct[14],'Novo');assert.equal(correct[17],'mock-reorder-id');
+  assert.equal(other[14],'Pendente envio');assert.equal(other[17],'');
+  assert.equal(f.calls.statusBodies[0].data[0].values[0][14],null);
+});
+
+test('estado manual alterado entre leitura e escrita nunca é substituído',async()=>{
+  const f=quoteSheetFixture({onBeforeStatusUpdate:({values})=>{values.find(row=>row[0]===REF)[14]='Em análise';}});
+  const entry=await storeQuote({QUOTE_CRM_ENABLED:'true'},DATA,REF,Date.now(),f.options);
+  await markQuoteReceived(entry,'mock-id',{fetcher:f.fetcher});
+  assert.equal(f.values[1][14],'Em análise');assert.equal(f.values[1][17],'mock-id');
+});
+
+test('repetição encontra a âncora pelo ID determinístico e linhas antigas não têm escrita por posição',async()=>{
+  const f=fixture();await storeQuote({QUOTE_CRM_ENABLED:'true'},DATA,REF,Date.now(),f.options);
+  const duplicate=await storeQuote({QUOTE_CRM_ENABLED:'true'},DATA,REF,Date.now(),f.options);
+  assert.equal(duplicate.rowMetadataId,undefined);
+  await markQuoteReceived(duplicate,'mock-id',{fetcher:f.fetcher});assert.equal(f.calls.update,1);
+  const old=fixture();old.values.push(quoteRow(DATA,REF,Date.now()));
+  const legacy=await storeQuote({QUOTE_CRM_ENABLED:'true'},DATA,REF,Date.now(),old.options);
+  await assert.rejects(markQuoteReceived(legacy,'must-not-write',{fetcher:old.fetcher}),/sheets_row_marker_missing/);
+  assert.equal(old.calls.update,0);assert.equal(old.values[1][17],'');
+});
+
+test('filtro não pode apontar a outro separador ou anunciar mais de uma linha',async()=>{
+  for(const kind of ['wrong-tab','duplicate-range','wrong-ref']){
+    const f=fixture(),entry=await storeQuote({QUOTE_CRM_ENABLED:'true'},DATA,REF,Date.now(),f.options);
+    const fetcher=async(url,init)=>{
+      const response=await f.fetcher(url,init);
+      if(!url.endsWith('/values:batchGetByDataFilter'))return response;
+      const result=await response.json();
+      if(kind==='wrong-tab')result.valueRanges[0].valueRange.range="'Outro'!A2:R2";
+      if(kind==='duplicate-range')result.valueRanges.push(structuredClone(result.valueRanges[0]));
+      if(kind==='wrong-ref')result.valueRanges[0].valueRange.values[0][0]=OTHER;
+      return Response.json(result);
+    };
+    await assert.rejects(markQuoteReceived(entry,'mock-id',{fetcher}),/sheets_row_marker_(?:missing|mismatch)/);
+    assert.equal(f.calls.update,0);
+  }
 });

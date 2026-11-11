@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {quoteSheetFixture} from './quote-sheet-fixture.mjs';
 import {QUOTE_HEADERS,quoteRow,quoteMetadataId,storeQuote} from '../src/quote-sheets.mjs';
 
 const REF='TS-0123456789ABCDEF0123';
@@ -9,50 +10,7 @@ const DATA={name:'Teste sintético',email:'synthetic@example.invalid',company:'E
   goal:'Poupar tempo',frequency:'Mensalmente',startingPoint:'Criar de raiz',tools:'Excel',specifics:'Relatório',
   deadline:'A definir',budget:'A definir',description:'Exclusivamente um teste local sem Google ou emails reais.'};
 
-function fixture({onBatch,metadataId,properties=[{properties:{sheetId:37,title:'Pedidos do Site'}}]}={}){
-  const values=[QUOTE_HEADERS.slice()],markers=new Map();
-  const calls={batches:[],committed:0,metadataGets:0,properties:0};
-  function commit(requests){
-    assert.equal(requests.length,2);
-    const marker=requests[0].createDeveloperMetadata.developerMetadata;
-    const append=requests[1].appendCells;
-    if(markers.has(marker.metadataId))return Response.json({error:{code:400}},{status:400});
-    assert.equal(marker.metadataKey,'tq');assert.equal(marker.metadataValue,undefined);
-    assert.deepEqual(marker.location,{sheetId:37});assert.equal(marker.visibility,'DOCUMENT');
-    assert.equal(append.sheetId,37);assert.equal(append.fields,'userEnteredValue');
-    assert.equal(append.rows.length,1);assert.equal(append.rows[0].values.length,18);
-    const row=append.rows[0].values.map(cell=>{
-      assert.deepEqual(Object.keys(cell),['userEnteredValue']);
-      assert.deepEqual(Object.keys(cell.userEnteredValue),['stringValue']);
-      assert.equal(typeof cell.userEnteredValue.stringValue,'string');
-      return cell.userEnteredValue.stringValue;
-    });
-    // Modelo de transação: validar tudo antes de aplicar as duas alterações juntas.
-    markers.set(marker.metadataId,structuredClone(marker));values.push(row);calls.committed++;
-    return Response.json({replies:[{createDeveloperMetadata:{developerMetadata:marker}},{}]});
-  }
-  async function fetcher(raw,init={}){
-    const url=new URL(raw);
-    if(url.pathname.endsWith(':batchUpdate')){
-      assert.equal(init.method,'POST');
-      const requests=JSON.parse(init.body).requests;
-      calls.batches.push(structuredClone(requests));
-      return onBatch?onBatch({requests,commit,calls,values,markers}):commit(requests);
-    }
-    if(url.pathname.includes('/developerMetadata/')){
-      calls.metadataGets++;
-      const id=Number(url.pathname.split('/').at(-1));
-      return markers.has(id)?Response.json(markers.get(id)):Response.json({error:{code:404}},{status:404});
-    }
-    if(url.searchParams.has('fields')){
-      calls.properties++;assert.equal(url.searchParams.get('fields'),'sheets(properties(sheetId,title))');
-      return Response.json({sheets:properties});
-    }
-    assert.equal(decodeURIComponent(url.pathname).split('/values/')[1],"'Pedidos do Site'!A1:R10000");
-    return Response.json({values:structuredClone(values)});
-  }
-  return {values,markers,calls,commit,options:{fetcher,authorize:async()=> 'synthetic-access',...(metadataId?{metadataId}:{})}};
-}
+const fixture=quoteSheetFixture;
 
 test('N chamadas concorrentes para a mesma referência registam uma única linha e marcador',async()=>{
   const f=fixture();
@@ -87,8 +45,8 @@ test('timeout antes de aplicar o batch não cria cache negativo e nova tentativa
   assert.equal(f.values.length,1);assert.equal(f.markers.size,0);
   const retry=await storeQuote(ENV,DATA,REF,RECEIVED,f.options);
   assert.equal(retry.duplicate,false);assert.equal(f.values.length,2);
-  assert.equal(f.calls.batches[0][0].createDeveloperMetadata.developerMetadata.metadataId,
-    f.calls.batches[1][0].createDeveloperMetadata.developerMetadata.metadataId);
+  assert.equal(f.calls.batches[0][2].createDeveloperMetadata.developerMetadata.metadataId,
+    f.calls.batches[1][2].createDeveloperMetadata.developerMetadata.metadataId);
 });
 
 test('resposta perdida depois do commit é recuperada sem nova escrita',async()=>{
@@ -196,4 +154,16 @@ test('IDs são determinísticos, positivos e válidos no intervalo int32',async(
   assert.notEqual(first,await quoteMetadataId(REF,1));
   await assert.rejects(quoteMetadataId('INVALID',0),/quote_reference_invalid/);
   await assert.rejects(quoteMetadataId(REF,8),/quote_reference_invalid/);
+});
+
+
+test('locale diferente de pt_PT bloqueia novas linhas antes de qualquer escrita e preserva repetições antigas',async()=>{
+ for(const locale of ['en_US','pt_BR','',null]){
+  const f=fixture({locale});
+  await assert.rejects(storeQuote(ENV,DATA,REF,RECEIVED,f.options),/sheets_locale_mismatch/);
+  assert.equal(f.calls.batches.length,0);assert.equal(f.values.length,1);
+  f.values.push(quoteRow(DATA,REF,RECEIVED));
+  const legacy=await storeQuote(ENV,DATA,REF,RECEIVED,f.options);
+  assert.equal(legacy.duplicate,true);assert.equal(f.calls.batches.length,0);
+ }
 });
