@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Pesquisa B2B TimeSaver: pequenas empresas, rotação geográfica e contactos bloqueados."""
 import json
+import math
 import os
 import re
 import time
@@ -103,9 +104,10 @@ def search_plan(day=None):
 
 
 ENDPOINTS = (
-    # Private.coffee autoriza uso comercial (termos de 10/04/2026).
+    # Europa, extrato Geofabrik atualizado diariamente.
+    "https://ovp.dresel.systems/api/interpreter",
+    # Instância global que permite utilização comercial.
     "https://overpass.private.coffee/api/interpreter",
-    # Reserva apenas para o piloto e com uso moderado.
     "https://overpass-api.de/api/interpreter",
 )
 HEADERS = [
@@ -665,24 +667,28 @@ def find_candidates(existing, limit, day=None):
         # Filtrar apenas estabelecimentos com email já documentado no OSM.
         # Evita consumir o limite de resultados com POI sem contacto e mantém
         # a exclusão de caixas pessoais em candidate().
-        area = f"around:{radius},{lat},{lon}"
+        # Bbox pequena usa índice espacial e evita operações radiais globais.
+        # A zona continua aproximada, não é um município confirmado.
+        lat_delta = radius / 111_320
+        lon_delta = radius / (111_320 * max(0.2, math.cos(math.radians(lat))))
+        bbox = f"{lat-lat_delta:.5f},{lon-lon_delta:.5f},{lat+lat_delta:.5f},{lon+lon_delta:.5f}"
         offices = "^(accountant|estate_agent|consulting|insurance|company|logistics)$"
         shops = "^(wholesale|trade|office_supplies|computer|hardware|electronics|pet)$"
         query = (
-            "[out:json][timeout:35];("
-            f'nwr({area})["office"~"{offices}"]["name"]["contact:email"];'
-            f'nwr({area})["office"~"{offices}"]["name"]["email"];'
-            f'nwr({area})["shop"~"{shops}"]["name"]["contact:email"];'
-            f'nwr({area})["shop"~"{shops}"]["name"]["email"];'
+            "[out:json][timeout:20];("
+            f'nwr({bbox})["office"~"{offices}"]["name"]["contact:email"];'
+            f'nwr({bbox})["office"~"{offices}"]["name"]["email"];'
+            f'nwr({bbox})["shop"~"{shops}"]["name"]["contact:email"];'
+            f'nwr({bbox})["shop"~"{shops}"]["name"]["email"];'
             ");out tags 250;"
         )
         elements = None
-        for endpoint in ENDPOINTS:
+        for endpoint in ENDPOINTS[:2]:
             try:
-                response = requests.post(
-                    endpoint, data={"data": query},
-                    headers={"User-Agent": "TimeSaverAutomation/1.2 (small business research; timesaverautomate.com)"},
-                    timeout=(5, 20),
+                response = requests.get(
+                    endpoint, params={"data": query},
+                    headers={"User-Agent": "TimeSaverAutomation/1.3 (business research; timesaverautomate.com)"},
+                    timeout=(5, 12),
                 )
                 if response.status_code != 200:
                     print(f"Fonte {endpoint}; zona {city}; HTTP {response.status_code}", flush=True)
