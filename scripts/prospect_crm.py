@@ -570,6 +570,8 @@ def simulate_resend(credentials, crm_rows, limit=30):
             allowed = False
         else:
             allowed, reason = evaluate_send_eligibility(crm_row, review, suppressed)
+            if allowed and str(review[9]).strip() != "Consentimento documentado":
+                allowed, reason = False, "Resend exige opt-in; cold outreach proibido"
         if not allowed:
             blocked[reason] = blocked.get(reason, 0) + 1
             continue
