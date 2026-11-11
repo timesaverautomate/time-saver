@@ -29,8 +29,17 @@ export function previewHTML(name, html) {
     return `<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title} — Time Saver</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css"></head><body><a class="skip-link" href="#conteudo">Saltar para o conteúdo</a><header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="Time Saver — início"><img src="/logo.svg" width="218" height="42" alt="Time Saver"></a><a class="button button-small" href="/#orcamento">Pré-lançamento</a></div></header><main id="conteudo" class="legal-main"><div class="container legal-container"><a href="/">← Voltar ao início</a><h1>${title}</h1><p class="legal-meta">TIME SAVER · PRÉ-LANÇAMENTO</p>${body}</div></main><footer class="site-footer"><div class="container footer-bottom"><span>Time Saver · Pré-lançamento</span><nav aria-label="Informações do website"><a href="/privacidade">Privacidade</a><a href="/aviso-legal">Sobre esta versão</a><a href="/cookies">Cookies</a></nav></div></footer></body></html>`;
   }
   if (name!=='index') return html;
-  const quoteSection=/<section class="quote section" id="orcamento"[\s\S]*?<\/section>/;
-  if (!quoteSection.test(html)) throw new Error('Secção de orçamento não encontrada; pré-lançamento bloqueado.');
+  // Os passos são secções aninhadas: remover sempre a secção exterior completa.
+  const start=html.search(/<section class="quote section" id="orcamento"(?=\s|>)/);
+  if(start<0)throw new Error('Secção de orçamento não encontrada; pré-lançamento bloqueado.');
+  const tags=html.slice(start).matchAll(/<\/?section\b[^>]*>/g);
+  let depth=0,end=-1;
+  for(const tag of tags){
+    depth+=tag[0].startsWith('</')?-1:1;
+    if(depth===0){end=start+tag.index+tag[0].length;break;}
+  }
+  if(end<0)throw new Error('Secção de orçamento incompleta; pré-lançamento bloqueado.');
+  const quoteSection=html.slice(start,end);
   html=html.replace(quoteSection,`<section class="quote section" id="orcamento" aria-labelledby="quote-title"><div class="container quote-grid"><div class="quote-intro"><p class="eyebrow dark"><span class="section-number">05 /</span> PRÉ-LANÇAMENTO</p><h2 id="quote-title">Estamos a preparar<br>o próximo <span class="serif-accent">passo.</span></h2><p>Já pode conhecer a Time Saver e explorar exemplos do que é possível automatizar. O pedido de orçamento ficará disponível aqui após concluirmos a preparação do serviço.</p></div><div class="prelaunch-card"><span class="small-ring" aria-hidden="true">↗</span><h3>Mais tempo. Menos tarefas.</h3><p>O formulário ainda não está disponível. Esta versão não recebe pedidos nem recolhe dados através de formulários.</p><a class="text-link" href="#servicos">Explorar os serviços <span aria-hidden="true">↗</span></a></div></div></section>`);
   html=html.replace('<main id="conteudo">','<main id="conteudo"><div class="preview-banner"><div class="container">Time Saver · Pré-lançamento <span>O pedido de orçamento ainda não está disponível.</span></div></div>');
   html=html.replaceAll('Pedir orçamento','Ver pré-lançamento')

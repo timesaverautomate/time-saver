@@ -264,8 +264,100 @@ if (form) {
     'Aplicação à medida':['Descreva o processo que a aplicação deve apoiar e as principais ações dos utilizadores.','Por exemplo: queremos uma ferramenta interna para registar pedidos, acompanhar estados e consultar a informação num único local.','O que deve ser possível fazer na aplicação?'],
     'Ainda não sei':['Conte-nos o que faz hoje, o que está a dar trabalho e o que gostaria de melhorar.','Por exemplo: todos os meses repetimos vários passos para preparar informação para a equipa. Gostaríamos de simplificar o processo e reduzir erros.','Há algum detalhe que ajude a perceber a necessidade?']
   };
+  const wizardRoot = form.closest('.quote-wizard');
+  const quotePanels = Array.from(form.querySelectorAll('[data-quote-step]'));
+  const wizardNavigation = form.querySelector('.wizard-navigation');
+  const previousStep = form.querySelector('[data-previous-step]');
+  const nextStep = form.querySelector('[data-next-step]');
+  const quoteStepButtons = Array.from(wizardRoot?.querySelectorAll('[data-go-step]')||[]);
+  const quoteEditButtons = Array.from(form.querySelectorAll('[data-edit-step]'));
+  const quoteProgress = wizardRoot?.querySelector('#quote-progress');
+  const quoteStepStatus = wizardRoot?.querySelector('[data-step-status]');
+  const quoteStepPercent = wizardRoot?.querySelector('[data-step-percent]');
+  const summaryContact = form.querySelector('#quote-summary-contact');
+  const summaryProject = form.querySelector('#quote-summary-project');
+  const wizardEnabled = Boolean(wizardRoot && quotePanels.length===3
+    && quotePanels.every((panel,index)=>panel.dataset.quoteStep===String(index))
+    && wizardNavigation && previousStep && nextStep && summaryContact && summaryProject);
+  const wizardControls = [...quoteStepButtons,...quoteEditButtons,previousStep,nextStep].filter(Boolean);
+  const contactFields = new Set(['name','email','company']);
+  let quoteStep = 0, pendingErrorFocus = '';
+  function syncWizardControls() {
+    if(!wizardEnabled)return;
+    for(const control of wizardControls)control.disabled=busy || sent;
+    previousStep.hidden=quoteStep===0;
+    nextStep.hidden=quoteStep===2;
+    wizardNavigation.hidden=sent;
+    quoteStepButtons.forEach(button=>{
+      const index=Number(button.dataset.goStep),active=index===quoteStep;
+      if(active)button.setAttribute('aria-current','step');
+      else button.removeAttribute('aria-current');
+      button.classList.toggle('is-active',active);
+      button.classList.toggle('is-complete',index<quoteStep);
+      const number=button.querySelector('.quote-step-number');
+      if(number)number.textContent=index<quoteStep?'✓':String(index+1).padStart(2,'0');
+    });
+    const status=translate('Passo '+(quoteStep+1)+' de 3','Step '+(quoteStep+1)+' of 3');
+    if(quoteStepStatus)quoteStepStatus.textContent=status;
+    if(quoteStepPercent)quoteStepPercent.textContent=Math.round((quoteStep+1)/3*100)+'%';
+    if(quoteProgress){quoteProgress.value=quoteStep+1;quoteProgress.setAttribute('aria-valuetext',status);}
+  }
+  function setQuoteStep(index,focus=true) {
+    if(!wizardEnabled || !Number.isInteger(index) || index<0 || index>2)return;
+    quoteStep=index;
+    quotePanels.forEach((panel,panelIndex)=>{panel.hidden=panelIndex!==index;});
+    if(index===2 && !sent)renderQuoteSummary(collect());
+    syncWizardControls();
+    if(focus)quotePanels[index].querySelector('[data-step-heading]')?.focus();
+  }
+  function revealQuoteField(name) {
+    if(!Object.hasOwn(labels,name))return;
+    const field=fieldNodes(name)[0];
+    const panel=field?.closest('[data-quote-step]');
+    if(panel)setQuoteStep(Number(panel.dataset.quoteStep),false);
+    const details=field?.closest('.optional-details');
+    if(details)details.open=true;
+  }
+  function summaryValue(name,data) {
+    const nodes=fieldNodes(name),field=nodes[0];
+    if(field?.tagName==='SELECT')return field.selectedOptions[0]?.textContent.trim()||data[name];
+    if(field?.type==='radio'){
+      const selected=nodes.find(node=>node.checked);
+      return selected?.closest('label')?.querySelector('strong')?.textContent.trim()||data[name];
+    }
+    return data[name]||'';
+  }
+  function renderQuoteSummary(data) {
+    if(!wizardEnabled)return;
+    summaryContact.replaceChildren();summaryProject.replaceChildren();
+    const groups=[[summaryContact,['name','email','company']],
+      [summaryProject,['service','description','goal','frequency','startingPoint','tools','deadline','specifics','budget']]];
+    for(const [container,names] of groups){
+      for(const name of names){
+        const value=data[name];
+        if(!value || (value==='A definir' && !['service','description'].includes(name)))continue;
+        if(!fieldNodes(name).length)continue;
+        const term=document.createElement('dt'),definition=document.createElement('dd');
+        term.textContent=labels[name];definition.textContent=summaryValue(name,data);
+        container.append(term,definition);
+      }
+    }
+  }
+  function moveQuoteStep(target) {
+    if(!wizardEnabled || busy || sent || !Number.isInteger(target) || target<0 || target>2)return;
+    if(target>quoteStep){
+      const errors=validate(collect());
+      const relevant=Object.fromEntries(Object.entries(errors).filter(([name])=>
+        contactFields.has(name) || target===2));
+      if(Object.keys(relevant).length){showErrors(relevant,true);return;}
+    }
+    // Os erros de campos já corrigidos não acompanham o visitante no passo seguinte.
+    if(result.querySelector('ul'))result.replaceChildren();
+    setQuoteStep(target);
+  }
   const fieldNodes = name => Array.from(form.querySelectorAll('[name="'+name+'"]'));
   function focusField(name) {
+    revealQuoteField(name);
     const fields=fieldNodes(name); (fields.find(field=>field.checked)||fields[0])?.focus();
   }
   function updateServiceContext() {
@@ -322,6 +414,12 @@ if (form) {
       list.append(item);
     }
     result.append(list);
+    const firstInvalid=Object.keys(translated).find(name=>Object.hasOwn(labels,name) && fieldNodes(name).length);
+    if(firstInvalid){
+      revealQuoteField(firstInvalid);
+      if(busy)pendingErrorFocus=firstInvalid;
+      else focusField(firstInvalid);
+    }
   }
   async function refreshToken() {
     if(checkingAvailability)return false;
@@ -381,6 +479,8 @@ if (form) {
   form.addEventListener('submit',async event=>{
     event.preventDefault();
     if (busy || sent) return;
+    // Enter e submissões programáticas nos primeiros passos apenas avançam.
+    if(wizardEnabled && quoteStep<2){moveQuoteStep(quoteStep+1);return;}
     if (!available) { showMessage(copy.notSent); return; }
     const data = collect();
     const errors = validate(data);
@@ -393,6 +493,7 @@ if (form) {
     busy = true; submit.disabled = true;
     if(retryAvailability)retryAvailability.disabled=true;
     editableFields.forEach(field=>{field.disabled=true;});
+    syncWizardControls();
     form.setAttribute('aria-busy','true'); submitLabel.textContent = copy.sending;
     result.replaceChildren();
     try {
@@ -407,6 +508,10 @@ if (form) {
         showMessage(copy.received+' '+copy.reference+payload.reference+'. '+copy.emailAcceptance,true);
         submitLabel.textContent = copy.accepted;
         form.reset();updateCounter();updateServiceContext();
+        if(wizardEnabled){
+          summaryContact.replaceChildren();summaryProject.replaceChildren();
+          wizardRoot.classList.add('wizard-sent');
+        }
         lastSignature='';submissionKey='';token='';
         if(retryAvailability)retryAvailability.hidden=true;
         const another=document.querySelector('#new-request');if(another)another.hidden=false;
@@ -428,6 +533,8 @@ if (form) {
       submit.disabled = !available || sent;
       if(retryAvailability)retryAvailability.disabled=checkingAvailability || sent;
       if (!sent) submitLabel.textContent = originalLabel;
+      syncWizardControls();
+      if(pendingErrorFocus){focusField(pendingErrorFocus);pendingErrorFocus='';}
     }
   });
   document.querySelector('#new-request')?.addEventListener('click',async()=>{
@@ -435,7 +542,23 @@ if (form) {
     sent=false;submissionKey='';lastSignature='';token='';result.replaceChildren();
     sessionRefreshNeeded=false;
     document.querySelector('#new-request').hidden=true;submitLabel.textContent=originalLabel;
-    await refreshToken();focusField('service');
+    Object.keys(labels).forEach(name=>setFieldError(name,''));
+    if(wizardEnabled){wizardRoot.classList.remove('wizard-sent');summaryContact.replaceChildren();summaryProject.replaceChildren();setQuoteStep(0,false);}
+    await refreshToken();focusField(wizardEnabled?'name':'service');
   });
+  if(wizardEnabled){
+    wizardRoot.classList.add('wizard-ready');
+    previousStep.addEventListener('click',()=>moveQuoteStep(quoteStep-1));
+    nextStep.addEventListener('click',()=>moveQuoteStep(quoteStep+1));
+    quoteStepButtons.forEach(button=>button.addEventListener('click',()=>moveQuoteStep(Number(button.dataset.goStep))));
+    quoteEditButtons.forEach(button=>button.addEventListener('click',()=>moveQuoteStep(Number(button.dataset.editStep))));
+    form.addEventListener('keydown',event=>{
+      if(event.key==='Enter' && !event.isComposing && !event.ctrlKey && !event.metaKey
+          && !event.altKey && !event.shiftKey && quoteStep<2 && event.target instanceof HTMLInputElement){
+        event.preventDefault();moveQuoteStep(quoteStep+1);
+      }
+    });
+    setQuoteStep(0,false);
+  }
   refreshToken();
 }
