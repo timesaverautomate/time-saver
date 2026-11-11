@@ -31,6 +31,62 @@ document.addEventListener('click',event=>{
 const currentYear = document.querySelector('#current-year');
 if (currentYear) currentYear.textContent = String(new Date().getFullYear());
 
+const flows = {
+  relatorios:[
+    translate('Vários ficheiros Excel','Several Excel files'),
+    translate('Informação espalhada, trabalho repetido.','Scattered information, repeated work.'),
+    translate('Ligar. Organizar. Automatizar.','Connect. Organise. Automate.'),
+    translate('Um relatório organizado','One organised report'),
+    translate('Dados reunidos. Informação pronta a consultar.','Data brought together. Information ready to review.'),
+    translate('Exemplo: reunir vários ficheiros Excel num relatório organizado.','Example: combine several Excel files into one organised report.')
+  ],
+  integracoes:[
+    translate('Informação em várias ferramentas','Information across several tools'),
+    translate('O mesmo dado introduzido mais do que uma vez.','The same data entered more than once.'),
+    translate('Validar. Ligar. Sincronizar.','Validate. Connect. Synchronise.'),
+    translate('Ferramentas em sintonia','Tools working together'),
+    translate('Uma ligação definida entre ferramentas compatíveis.','A defined connection between compatible tools.'),
+    translate('Exemplo: integrar ferramentas compatíveis para reduzir a introdução repetida de dados.','Example: integrate compatible tools to reduce repeated data entry.')
+  ],
+  pedidos:[
+    translate('Pedidos recebidos pela equipa','Requests received by the team'),
+    translate('Tarefas e estados em locais diferentes.','Tasks and statuses in different places.'),
+    translate('Reunir. Organizar. Acompanhar.','Collect. Organise. Track.'),
+    translate('Um processo acompanhado','A process you can follow'),
+    translate('Pedidos organizados, com um estado definido.','Requests organised, each with a defined status.'),
+    translate('Exemplo: organizar pedidos internos numa aplicação à medida.','Example: organise internal requests in a custom application.')
+  ]
+};
+const flowButtons = Array.from(document.querySelectorAll('[data-flow]'));
+function selectFlow(button,focus=false) {
+  if(!Object.hasOwn(flows,button.dataset.flow))return;
+  const values=flows[button.dataset.flow];
+  const targets=['flow-source','flow-source-note','flow-action','flow-result','flow-result-note','flow-caption'].map(id=>document.getElementById(id));
+  if(targets.some(target=>!target))return;
+  flowButtons.forEach(tab=>{
+    const selected=tab===button;
+    tab.setAttribute('aria-selected',String(selected));
+    tab.tabIndex=selected?0:-1;
+  });
+  targets.forEach((target,index)=>{target.textContent=values[index];});
+  targets[5].setAttribute('aria-labelledby',button.id);
+  if(focus)button.focus();
+}
+flowButtons.forEach((button,index)=>{
+  button.addEventListener('click',()=>selectFlow(button));
+  button.addEventListener('keydown',event=>{
+    let next=index;
+    if(event.key==='ArrowRight')next=(index+1)%flowButtons.length;
+    else if(event.key==='ArrowLeft')next=(index+flowButtons.length-1)%flowButtons.length;
+    else if(event.key==='Home')next=0;
+    else if(event.key==='End')next=flowButtons.length-1;
+    else return;
+    event.preventDefault();selectFlow(flowButtons[next],true);
+  });
+});
+const initialFlow=flowButtons.find(button=>button.getAttribute('aria-selected')==='true')||flowButtons[0];
+if(initialFlow)selectFlow(initialFlow);
+
 const form = document.querySelector('#quote-form');
 if (form) {
   const copy={
