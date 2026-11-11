@@ -61,6 +61,19 @@ def domain(url):
     return hostname if "." in hostname else ""
 
 
+
+def review_signals(email, website):
+    """Triagem documental, não prova de propriedade, entrega ou consentimento."""
+    host = domain(website)
+    email_domain = email.rsplit("@", 1)[-1].lower() if "@" in email else ""
+    if not host:
+        return "REVER: sem website oficial identificado; confirmar email e empresa"
+    if email_domain != host:
+        return "REVER: domínio do email diferente do website; confirmar associação"
+    return "REVER: domínio do email coincide com website; confirmar atualidade e legitimidade"
+
+
+
 def candidate(element, city):
     tags = element.get("tags") or {}
     name = str(tags.get("name") or "").strip()
@@ -86,7 +99,7 @@ def candidate(element, city):
     row[9] = "Por contactar"
     row[11] = "Rever empresa e email antes de qualquer contacto"
     row[15] = f"https://www.openstreetmap.org/{osm_type}/{osm_id}"
-    row[16] = "OSM público; dados não verificados; inserção de teste"
+    row[16] = "OSM público; dados não verificados; " + review_signals(email, row[3])
     row[23] = "Por avaliar"
     row[24] = "Sim"  # Bloqueio explícito de contacto até revisão.
     row[25] = f"osm:{osm_type}:{osm_id}"
@@ -277,7 +290,7 @@ def prepare_rows_for_write(latest, candidates, limit, day=None):
         if any(row[i] for i in range(17, 23)):
             raise RuntimeError("Campos de email devem permanecer vazios.")
         if day:
-            row[16] = "OSM público; dados por verificar; " + AUTO_MARKER + day
+            row[16] = str(row[16]) + "; " + AUTO_MARKER + day
         fresh.append(row)
         mark_seen(row, keys)
         if len(fresh) >= limit:
