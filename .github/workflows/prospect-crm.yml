@@ -9,7 +9,7 @@ on:
         options: [simular, teste_escrita_2]
         default: simular
   schedule:
-    - cron: '15 8 * * 1-5'
+    - cron: '15 8 * * *'
   push:
     branches: [main]
     paths:
@@ -51,6 +51,6 @@ jobs:
       - name: Pesquisa CRM (sem envios)
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          CRM_MODE: ${{ github.event_name == 'schedule' && 'diario' || inputs.mode || 'simular' }}
+          CRM_MODE: ${{ github.event_name == 'schedule' && 'simular' || inputs.mode || 'simular' }}
           CRM_DAILY_WRITE_ENABLED: ${{ vars.CRM_DAILY_WRITE_ENABLED || 'false' }}
         run: python scripts/prospect_crm.py
