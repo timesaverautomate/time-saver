@@ -12,6 +12,13 @@ name: TimeSaver - prospeção aprovada e reconciliação Resend
         description: 'Para envio manual, escrever ENVIAR'
         type: string
         required: false
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/outreach-legal.yml'
+      - 'scripts/outreach_approved.py'
+      - 'scripts/prospect_crm.py'
+      - 'tests/test_outreach_approved.py'
   schedule:
     - cron: '30 9 * * 1-5'
     - cron: '30 16 * * *'
