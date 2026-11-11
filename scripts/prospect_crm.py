@@ -248,22 +248,44 @@ def prospect_score(row):
     return max(0, score)
 
 
-def draft_proposal(row):
-    """Rascunho interno; não envia mensagens."""
+def proposal_content(row):
+    """Proposta setorial baseada apenas em hipóteses, sem alegar pesquisa individual."""
     sector = norm(row[1] if len(row) > 1 else "")
+    name = str(row[0]).strip()[:80] if row else "a vossa empresa"
     if "contab" in sector or "accountant" in sector:
-        benefit = "automatizar reconciliações, tratamento de documentos e relatórios"
+        subject = "Menos tempo em tarefas de contabilidade"
+        opportunity = "reconciliações, tratamento de documentos e relatórios"
     elif "estate_agent" in sector or "imobili" in sector:
-        benefit = "automatizar acompanhamento de contactos, tarefas e documentação"
+        subject = "Automatização de processos imobiliários"
+        opportunity = "registo de contactos, acompanhamento de clientes e documentação"
+    elif "insurance" in sector or "segur" in sector:
+        subject = "Menos trabalho administrativo na mediação"
+        opportunity = "tratamento de pedidos, documentação e acompanhamento de clientes"
+    elif "computer" in sector or "electronics" in sector or "mobile_phone" in sector:
+        subject = "Menos tarefas repetitivas na gestão da loja"
+        opportunity = "pedidos, atualizações de stock e relatórios de vendas"
+    elif "consult" in sector:
+        subject = "Automatizar tarefas na gestão de projetos"
+        opportunity = "relatórios, organização de documentos e acompanhamento de tarefas"
     else:
-        benefit = "reduzir tarefas repetitivas e integrar processos administrativos"
-    return (
-        f"RASCUNHO NÃO ENVIADO — Bom dia, equipa {str(row[0])[:80]}. "
-        f"Na TimeSaver ajudamos empresas a {benefit}, poupando tempo operacional. "
-        "Faria sentido conversarmos brevemente para identificar oportunidades concretas? "
-        "Cumprimentos, Equipa TimeSaver."
+        subject = "Uma ideia para poupar tempo na sua empresa"
+        opportunity = "atualização de ficheiros, gestão de pedidos e relatórios"
+    body = (
+        f"Bom dia, equipa {name},\\n\\n"
+        "Somos a TimeSaver e ajudamos empresas a automatizar processos repetitivos.\\n\\n"
+        f"No vosso setor, pode fazer sentido simplificar {opportunity}. "
+        "Não sabemos se estes processos representam um desafio na vossa empresa, "
+        "mas gostaríamos de perceber se existe alguma oportunidade de melhoria.\\n\\n"
+        "Faria sentido uma conversa breve, sem compromisso?\\n\\n"
+        "Cumprimentos,\\nEquipa TimeSaver"
     )
+    return subject, body
 
+
+def draft_proposal(row):
+    """Rascunho interno; nunca envia mensagens."""
+    subject, body = proposal_content(row)
+    return "RASCUNHO NÃO ENVIADO — Assunto: " + subject + "\\n" + body
 
 
 
