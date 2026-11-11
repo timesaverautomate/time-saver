@@ -349,6 +349,37 @@ def build_resend_preview(row):
 
 
 
+
+def suppression_index(crm_rows):
+    """Reutiliza oposições e falhas registadas no CRM em todas as linhas."""
+    suppressed = set()
+    for row in crm_rows:
+        email = str(row[4]).strip().lower() if len(row) > 4 else ""
+        if not email:
+            continue
+        contact_block = str(row[24]).strip().casefold() if len(row) > 24 else ""
+        delivery = norm(row[21]) if len(row) > 21 else ""
+        if contact_block == "sim" or delivery in (
+            "bounce", "cancelou subscricao", "erro", "complaint", "spam"
+        ):
+            suppressed.add(email)
+    return suppressed
+
+
+def unique_send_candidates(rows):
+    """Um único destinatário por execução, independentemente do número de empresas."""
+    seen = set()
+    unique = []
+    for score, row in sorted(rows, key=lambda pair: pair[0], reverse=True):
+        email = str(row[4]).strip().lower()
+        if email in seen:
+            continue
+        seen.add(email)
+        unique.append((score, row))
+    return unique
+
+
+
 def simulate_resend(credentials, crm_rows, limit=30):
     """Simulação integral de elegibilidade e payload Resend; sem chamadas à Resend."""
     response = requests.get(
@@ -363,6 +394,7 @@ def simulate_resend(credentials, crm_rows, limit=30):
     review_by_line = {str(r[11]).strip(): r for r in values[1:] if len(r) > 11}
     blocked = {}
     eligible = []
+    suppressed = suppression_index(crm_rows)
     for line, crm_row in enumerate(crm_rows, start=2):
         if not crm_row or not crm_row[0]:
             continue
@@ -371,13 +403,12 @@ def simulate_resend(credentials, crm_rows, limit=30):
             reason = "Revisão ausente ou não corresponde ao CRM"
             allowed = False
         else:
-            allowed, reason = evaluate_send_eligibility(crm_row, review)
+            allowed, reason = evaluate_send_eligibility(crm_row, review, suppressed)
         if not allowed:
             blocked[reason] = blocked.get(reason, 0) + 1
             continue
         eligible.append((prospect_score(crm_row), crm_row))
-    eligible.sort(key=lambda pair: pair[0], reverse=True)
-    selected = eligible[:limit]
+    selected = unique_send_candidates(eligible)[:limit]
     print(f"SIMULAÇÃO RESEND: {len(crm_rows)} empresas; {len(eligible)} elegíveis; {len(selected)} selecionadas; 0 envios.")
     for reason, count in sorted(blocked.items()):
         print(f"Bloqueados — {reason}: {count}")
