@@ -1,0 +1,5 @@
+flask>=3.0,<4
+svix>=1.0,<2
+gunicorn>=22,<24
+google-auth>=2.0,<3
+requests>=2.31,<3
