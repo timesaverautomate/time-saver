@@ -199,6 +199,23 @@ export async function checkCrm(json,event,http=fetch) {
   return summary;
 }
 
+
+// Durable Object reserved for serialized CRM updates. This first stage is
+// deliberately inert: no webhook routes requests here and no Sheets writes occur.
+export class CrmEventCoordinator {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    this.pending = Promise.resolve();
+  }
+  async fetch(request) {
+    // Only accept an explicit internal health probe; never write on this path.
+    if (new URL(request.url).pathname === "/internal/health" && request.method === "GET")
+      return response({status:"ready",crm_writes_enabled:false});
+    return response({error:"not_found"},404);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
