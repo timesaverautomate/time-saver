@@ -25,7 +25,7 @@ name: TimeSaver - prospeção aprovada e reconciliação Resend
 permissions:
   contents: read
 concurrency:
-  group: timesaver-prospeccao-crm
+  group: ${{ github.event_name == 'push' && github.workflow || 'timesaver-prospeccao-crm' }}
   cancel-in-progress: false
 jobs:
   prospeccao:
