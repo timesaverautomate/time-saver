@@ -1,0 +1,50 @@
+name: TimeSaver - prospeção aprovada e reconciliação Resend
+'on':
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Pré-visualizar, enviar apenas contactos aprovados ou reconciliar entregas'
+        type: choice
+        required: true
+        default: preview
+        options: [preview, send, reconcile]
+      confirm:
+        description: 'Para envio manual, escrever ENVIAR'
+        type: string
+        required: false
+  schedule:
+    - cron: '30 9 * * 1-5'
+    - cron: '30 16 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: timesaver-prospeccao-crm
+  cancel-in-progress: false
+jobs:
+  prospeccao:
+    if: github.repository_id == '1452563434' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Auditar repositório antes de usar credenciais
+        run: python scripts/audit-repository-secrets.py
+      - name: Instalar dependências aprovadas
+        run: >-
+          python -m pip install --index-url https://pypi.org/simple --require-hashes --only-binary=:all: -r requirements-crm.txt
+      - name: Validar fluxo e bloqueios de segurança
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Executar modo autorizado
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          TEST_MAIL_FROM: ${{ vars.TEST_MAIL_FROM }}
+          CRM_OUTREACH_MODE: ${{ github.event_name == 'schedule' && (github.event.schedule == '30 16 * * *' && 'reconcile' || 'send') || inputs.mode || 'preview' }}
+          CRM_OUTREACH_CONFIRM: ${{ inputs.confirm }}
+        run: python scripts/outreach_approved.py
