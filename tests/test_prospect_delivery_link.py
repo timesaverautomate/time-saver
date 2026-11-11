@@ -32,5 +32,54 @@ class TestDeliveryLink(unittest.TestCase):
         with self.assertRaises(ValueError):
             plan_email_id_update(self.rows, 2, "geral@empresa.pt", self.id)
 
+
+class FakeResponse:
+    def __init__(self, payload):
+        self.payload = payload
+    def raise_for_status(self):
+        pass
+    def json(self):
+        return self.payload
+
+class FakeSession:
+    def __init__(self, rows):
+        self.rows = rows
+        self.writes = []
+    def get(self, url, **kwargs):
+        return FakeResponse({"values": self.rows})
+    def put(self, url, **kwargs):
+        self.writes.append((url, kwargs))
+        return FakeResponse({"updatedCells": 1})
+
+class TestSaveResendId(unittest.TestCase):
+    def test_write_exactly_w(self):
+        from scripts.prospect_delivery_link import save_resend_id
+        rows = [[""] * 26 for _ in range(2)]
+        rows[0][22] = "ID mensagem Resend"
+        rows[0][24] = "Não contactar"
+        rows[1][4] = "geral@empresa.pt"
+        fake = FakeSession(rows)
+        credential = type("Credentials", (), {"token": "test-token"})()
+        result = save_resend_id(credential, 2, "geral@empresa.pt",
+                                "01a1cac4-3b11-72cf-b6bc-32fc6bd7283b", fake)
+        self.assertTrue(result)
+        self.assertEqual(len(fake.writes), 1)
+        self.assertIn("W2", fake.writes[0][0])
+        self.assertEqual(fake.writes[0][1]["params"]["valueInputOption"], "RAW")
+
+    def test_blocked_does_not_write(self):
+        from scripts.prospect_delivery_link import save_resend_id
+        rows = [[""] * 26 for _ in range(2)]
+        rows[0][22] = "ID mensagem Resend"
+        rows[0][24] = "Não contactar"
+        rows[1][4] = "geral@empresa.pt"
+        rows[1][24] = "Sim"
+        fake = FakeSession(rows)
+        credential = type("Credentials", (), {"token": "test-token"})()
+        with self.assertRaises(ValueError):
+            save_resend_id(credential, 2, "geral@empresa.pt",
+                           "01a1cac4-3b11-72cf-b6bc-32fc6bd7283b", fake)
+        self.assertEqual(fake.writes, [])
+
 if __name__ == "__main__":
     unittest.main()
