@@ -1,4 +1,7 @@
 export const SERVICE_OPTIONS = ['Ainda não sei', 'Excel', 'VBA', 'Excel, macros e VBA', 'Automação de processos', 'Dashboards e relatórios', 'Tratamento de dados', 'Aplicação à medida', 'Integração entre ferramentas', 'Outro'];
+// Ordem canónica para pedidos com várias áreas. O texto final mantém o formato
+// existente do email e da coluna Serviço; os valores antigos continuam válidos.
+export const SERVICE_GROUP_OPTIONS = ['Excel, macros e VBA','Automação de processos','Dashboards e relatórios','Tratamento de dados','Integração entre ferramentas','Aplicação à medida'];
 export const GOAL_OPTIONS = ['A definir','Poupar tempo','Reduzir erros','Melhorar a informação de gestão','Ligar ferramentas','Organizar e acompanhar processos','Outro'];
 export const FREQUENCY_OPTIONS = ['A definir','Várias vezes por dia','Diariamente','Semanalmente','Mensalmente','Pontualmente'];
 export const STARTING_POINT_OPTIONS = ['A definir','Já existe um ficheiro ou processo','Melhorar uma solução existente','Criar de raiz'];
@@ -33,6 +36,21 @@ export function validateSubmission(input) {
   if (!validEmail(data.email)) errors.email = 'Indique um email válido, por exemplo nome@empresa.pt.';
   for (const [field, options] of [['service', SERVICE_OPTIONS], ['budget', BUDGET_OPTIONS], ['deadline', DEADLINE_OPTIONS],['goal',GOAL_OPTIONS],['frequency',FREQUENCY_OPTIONS],['startingPoint',STARTING_POINT_OPTIONS]]) {
     const value = input[field] ?? options[0];
+    if(field==='service' && Array.isArray(value)){
+      if(value.length<1 || value.length>SERVICE_GROUP_OPTIONS.length){
+        errors.service='Selecione uma das opções disponíveis.';
+        continue;
+      }
+      const selected=new Set(value);
+      if(selected.size!==value.length
+        || Array.from(selected).some(option=>typeof option!=='string'
+          || ![...SERVICE_GROUP_OPTIONS,'Ainda não sei'].includes(option))
+        || selected.has('Ainda não sei') && selected.size!==1){
+        errors.service='Selecione uma das opções disponíveis.';
+      }else data.service=selected.has('Ainda não sei')?'Ainda não sei'
+        :SERVICE_GROUP_OPTIONS.filter(option=>selected.has(option)).join(' · ');
+      continue;
+    }
     if (typeof value !== 'string' || !options.includes(value)) errors[field] = 'Selecione uma das opções disponíveis.';
     else data[field] = value;
   }

@@ -28,7 +28,7 @@ export function quoteRow(data,reference,received){
   return [
     reference,new Date(received).toISOString(),safeField(data.name,100),
     safeField(data.email,254),safeField(data.company,160),
-    safeField(data.service,100),safeField(data.goal,100),
+    safeField(data.service,300),safeField(data.goal,100),
     safeField(data.frequency,80),safeField(data.startingPoint,120),
     safeField(data.tools,500),safeField(data.specifics,500),
     safeField(data.deadline,100),safeField(data.budget,100),
