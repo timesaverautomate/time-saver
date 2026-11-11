@@ -44,7 +44,7 @@ GENERIC_LOCAL_PARTS = {
 EMAIL_RE = re.compile(r"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$", re.I)
 MAX_TEST_WRITES = 2
 MAX_DAILY_WRITES = 30
-DAILY_WRITE_APPROVED_IN_CODE = False  # Libertar apenas após validação operacional
+DAILY_WRITE_APPROVED_IN_CODE = True  # Recolha diaria autorizada; emails permanecem bloqueados
 AUTO_MARKER = 'TSCRM_AUTO_DATE='
 FREE_EMAIL_DOMAINS = {'gmail.com', 'hotmail.com', 'outlook.com', 'live.com', 'yahoo.com', 'icloud.com', 'proton.me'}
 
