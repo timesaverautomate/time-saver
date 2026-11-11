@@ -166,7 +166,7 @@ test('conteúdo adulterado, assinatura falsa e assinatura de evento expirado sã
 test('assinatura válida mantém dry-run e ignora tipos desconhecidos sem rede ou escrita', async t => {
   t.mock.method(Date, 'now', () => NOW);
   t.mock.method(globalThis, 'fetch', () => { throw Error('webhook_must_not_call_any_provider'); });
-  const env = { RESEND_WEBHOOK_SECRET: SECRET, RESEND_WEBHOOK_WRITE_ENABLED: 'true' };
+  const env = { RESEND_WEBHOOK_SECRET: SECRET, RESEND_WEBHOOK_WRITE_ENABLED: 'true', CRM_COORDINATOR: { idFromName: () => 'test-id', get: () => ({ fetch: async () => new Response(JSON.stringify({ accepted:true, mode:'dry_run', crm_writes_enabled:false, crm_check:'credentials_missing' }), {status:200}) }) } };
   const event = JSON.stringify({ type: 'email.delivered', data: { email_id: 'synthetic-message-id' } });
   const response = await webhook.fetch(await requestFor(event), env);
   assert.equal(response.status, 200);
@@ -207,4 +207,12 @@ test('CRM rejects late sent events after delivery and only plans narrow cells', 
  const delayed={...row}; delayed[21]='Entrega atrasada';
  assert.deepEqual(planCrmEvent([header,delayed],{type:'email.delivered',data:{email_id:'id-1'}}).updates,
    [{range:"'Pedidos'!V2",values:[['Entregue']]}]);
+});
+
+test('webhook fails closed without coordinator binding', async t => {
+ t.mock.method(Date,'now',()=>NOW);
+ const body=JSON.stringify({type:'email.delivered',data:{email_id:'test-id'}});
+ const res=await webhook.fetch(await requestFor(body),{RESEND_WEBHOOK_SECRET:SECRET});
+ assert.equal(res.status,503);
+ assert.deepEqual(await res.json(),{error:'coordinator_unavailable'});
 });
