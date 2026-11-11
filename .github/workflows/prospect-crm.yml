@@ -51,6 +51,6 @@ jobs:
       - name: Pesquisa CRM (sem envios)
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          CRM_MODE: ${{ github.event_name == 'schedule' && 'simular' || inputs.mode || 'simular' }}
-          CRM_DAILY_WRITE_ENABLED: ${{ vars.CRM_DAILY_WRITE_ENABLED || 'false' }}
+          CRM_MODE: ${{ github.event_name == 'schedule' && 'diario' || inputs.mode || 'simular' }}
+          CRM_DAILY_WRITE_ENABLED: ${{ github.event_name == 'schedule' && 'true' || 'false' }}
         run: python scripts/prospect_crm.py
