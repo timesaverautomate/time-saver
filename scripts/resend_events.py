@@ -79,3 +79,42 @@ def plan_attempt(row, email_id, sent_at=None):
     return {"Data 1.º envio": str(row[17]).strip() or sent_at,
             "Data último envio": sent_at, "N.º emails enviados": count + 1,
             "Estado email Resend": "Enviado", "ID mensagem Resend": str(email_id)}
+
+
+def build_sheet_updates(rows, payload, authenticated=False):
+    """Produz alterações mínimas V/Y, sem sobrescrever outras colunas."""
+    plans = plan_event_updates(rows, payload, authenticated=authenticated)
+    updates = []
+    for plan in plans:
+        line = plan["crm_row"]
+        updates.append({"range": f"Pedidos!V{line}", "values": [[plan["state"]]]})
+        if plan["block_contact"]:
+            updates.append({"range": f"Pedidos!Y{line}", "values": [["Sim"]]})
+    return updates
+
+
+def write_sheet_updates(session, spreadsheet_id, rows, payload, authenticated=False,
+                        enabled=False):
+    """Escrita explicitamente desativada; exige autenticação prévia do webhook.
+
+    session é um cliente HTTP já autenticado; a função nunca valida assinaturas.
+    O chamador terá de verificar assinatura Svix/Resend antes de authenticated=True.
+    """
+    updates = build_sheet_updates(rows, payload, authenticated=authenticated)
+    if not enabled:
+        return {"mode": "dry_run", "planned_cells": len(updates), "written_cells": 0}
+    if not updates:
+        return {"mode": "write", "planned_cells": 0, "written_cells": 0}
+    if not spreadsheet_id or not str(spreadsheet_id).strip():
+        raise ValueError("ID da folha em falta")
+    from urllib.parse import quote
+    url = ("https://sheets.googleapis.com/v4/spreadsheets/"
+           + quote(str(spreadsheet_id), safe="") + "/values:batchUpdate")
+    response = session.post(url, json={"valueInputOption": "RAW", "data": updates}, timeout=30)
+    response.raise_for_status()
+    result = response.json()
+    changed = result.get("totalUpdatedCells")
+    if changed != len(updates):
+        raise RuntimeError("Sheets não confirmou todas as alterações")
+    return {"mode": "write", "planned_cells": len(updates),
+            "written_cells": changed}
