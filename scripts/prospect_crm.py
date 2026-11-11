@@ -321,6 +321,28 @@ def write_candidates(credentials, candidates, limit, mode, day=None):
     return count
 
 
+
+def publish_summary(mode, before, found, written, status="Concluído"):
+    """Resumo sem emails ou dados pessoais no separador Summary do GitHub Actions."""
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return
+    lines = [
+        "## TimeSaver — pesquisa B2B",
+        f"- Estado: {status}",
+        f"- Data (Portugal): {today_lisbon()}",
+        f"- Modo: {mode}",
+        f"- Empresas já no CRM: {before}",
+        f"- Candidatos novos encontrados: {found}",
+        f"- Registos adicionados ao CRM: {written}",
+        "- Emails enviados: **0**",
+        "- Contactos novos: **bloqueados até verificação manual**",
+    ]
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write("\\n".join(lines) + "\\n")
+
+
+
 def main():
     mode = validate_mode(os.environ.get("CRM_MODE", "simular"), os.environ)
     credentials = google_credentials()
@@ -332,15 +354,19 @@ def main():
         print(f"Quota automática {day}: {MAX_DAILY_WRITES - remaining}/{MAX_DAILY_WRITES} usadas.")
         if remaining == 0:
             print("Quota esgotada; zero escritas e nenhum email.")
+            publish_summary(mode, len(existing), 0, 0, "Quota diária atingida")
             return
         candidates = find_candidates(existing, remaining)
-        write_candidates(credentials, candidates, remaining, mode, day=day)
+        written = write_candidates(credentials, candidates, remaining, mode, day=day)
+        publish_summary(mode, len(existing), len(candidates), written)
     elif mode == "teste_escrita_2":
         candidates = find_candidates(existing, MAX_TEST_WRITES)
-        write_candidates(credentials, candidates, MAX_TEST_WRITES, mode)
+        written = write_candidates(credentials, candidates, MAX_TEST_WRITES, mode)
+        publish_summary(mode, len(existing), len(candidates), written)
     else:
-        find_candidates(existing, MAX_DAILY_WRITES)
+        candidates = find_candidates(existing, MAX_DAILY_WRITES)
         print("SIMULAÇÃO: nenhuma escrita e nenhum envio de email.")
+        publish_summary(mode, len(existing), len(candidates), 0)
 
 
 if __name__ == "__main__":
