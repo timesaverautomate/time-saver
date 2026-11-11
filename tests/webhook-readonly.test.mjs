@@ -103,3 +103,31 @@ test('provider errors cannot disclose credentials or full code',async()=>{
   const r=await verifyResendWebhookReadOnly(f.options);assert.equal(r.verified,false);assert.equal(r.httpStatus,403);
   assert.equal(r.cloudflareMutations,0);assert.ok(!JSON.stringify(r).includes(f.env.CLOUDFLARE_API_TOKEN));assert.ok(!JSON.stringify(r).includes(SOURCE));
 });
+
+test('hash mismatch diagnostics classify transport-only differences without accepting them or exposing code',async()=>{
+  const f=fixture({remoteSource:'\uFEFF'+SOURCE.replace(/\n/g,'\r\n')+' \r\n'});
+  const r=await verifyResendWebhookReadOnly(f.options);
+  assert.equal(r.verified,false);assert.equal(r.installed,false);assert.equal(r.code,'published_code_hash_mismatch');
+  assert.equal(r.diagnostic.kind,'source_hash_mismatch');assert.equal(r.diagnostic.diagnosticOnly,true);
+  assert.match(r.diagnostic.local.sha256,/^[a-f0-9]{64}$/);assert.match(r.diagnostic.remote.sha256,/^[a-f0-9]{64}$/);
+  assert.notEqual(r.diagnostic.local.sha256,r.diagnostic.remote.sha256);
+  assert.equal(r.diagnostic.local.bytes,Buffer.byteLength(SOURCE));assert.equal(r.diagnostic.remote.hasBom,true);
+  assert.ok(r.diagnostic.remote.crlfCount>0);assert.equal(r.diagnostic.equivalentAfter.combinedTransportNormalization,true);
+  assert.equal(f.calls.some(c=>!c.url.startsWith('https://api.cloudflare.com/')),false);
+  assert.ok(!JSON.stringify(r).includes(SOURCE));
+});
+
+test('source-map-only and genuine security-code changes remain mismatches with boolean correction markers',async()=>{
+  const map=fixture({remoteSource:SOURCE+'\n//# sourceMappingURL=https://private-map.invalid/?private_value=not-for-output\n'});
+  const mapped=await verifyResendWebhookReadOnly(map.options);
+  assert.equal(mapped.verified,false);assert.equal(mapped.diagnostic.equivalentAfter.sourceMapTrailer,true);
+  assert.ok(!JSON.stringify(mapped).includes('private-map'));assert.ok(!JSON.stringify(mapped).includes('not-for-output'));
+  const older=SOURCE.replace('redirect:"manual", signal:AbortSignal.timeout(12000)','redirect:"follow", signal:AbortSignal.timeout(3000)');
+  assert.notEqual(older,SOURCE);
+  const f=fixture({remoteSource:older}),r=await verifyResendWebhookReadOnly(f.options);
+  assert.equal(r.verified,false);assert.equal(r.code,'published_code_hash_mismatch');
+  assert.equal(r.diagnostic.local.markers.googleRedirectManual,true);assert.equal(r.diagnostic.local.markers.googleTimeout12000,true);
+  assert.equal(r.diagnostic.remote.markers.googleRedirectManual,false);assert.equal(r.diagnostic.remote.markers.googleTimeout12000,false);
+  assert.equal(r.diagnostic.equivalentAfter.combinedTransportNormalization,false);
+  assert.ok(f.calls.every(c=>c.options.method==='GET'));
+});

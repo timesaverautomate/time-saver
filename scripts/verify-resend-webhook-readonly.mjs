@@ -32,6 +32,42 @@ function observationDisabled(settings){
     &&settings.observability.logs?.enabled!==true
     &&settings.observability.logs?.invocation_logs!==true;
 }
+function sourceDifference(local,remote){
+  const bytes=value=>Buffer.byteLength(value,'utf8');
+  const lineEndings=value=>value.replace(/\r\n/g,'\n');
+  const trimEnd=value=>value.replace(/[\t \r\n]+$/u,'');
+  const withoutMap=value=>value.replace(/(?:\r?\n)?\/\/[#@]\s*sourceMappingURL=[^\r\n]*(?:\r?\n)?[\t ]*$/u,'');
+  const withoutBom=value=>value.replace(/^\uFEFF/u,'');
+  const markers=value=>{
+    const compact=value.replace(/\s+/g,'');
+    const start=value.search(/function\s+googleRequest\s*\(/);
+    const next=start<0?-1:value.slice(start+1).search(/(?:export\s+)?(?:async\s+)?function\s+googleToken\s*\(/);
+    const google=start<0?'':value.slice(start,next<0?start+1500:start+1+next);
+    const timeout=google.match(/AbortSignal\.timeout\(\s*([0-9_]+(?:e[0-9]+)?)\s*\)/i)?.[1];
+    return {directDefaultExport:/export\s+default\b/.test(value),
+      listDefaultExport:/export\s*\{[^}]*\bas\s+default\b/s.test(value),
+      directCoordinatorExport:/export\s+class\s+CrmEventCoordinator\b/.test(value),
+      wranglerSourcePreamble:/^\s*\/\/\s*workers\/resend-webhook\.js/.test(value),
+      boundedWebhookBody:/\breadWebhookBody\s*\(/.test(value)&&/\bMAX_BODY\s*=\s*65_?536\b/.test(value),
+      googleRequestHelper:start>=0,
+      googleRedirectManual:/redirect\s*:\s*["']manual["']/.test(google),
+      googleTimeout12000:timeout!==undefined&&Number(timeout.replaceAll('_',''))===12000,
+      boundedGoogleAccessToken:/\.access_token\.length\s*>\s*4096\b/.test(value),
+      activeWriterFailureRetries:compact.includes('if(writeRequested)returnretryWrite(reason)'),
+      coordinatorMandatory:compact.includes('if(!env?.CRM_COORDINATOR)returnresponse(')};
+  };
+  const canonical=value=>trimEnd(withoutMap(lineEndings(withoutBom(value))));
+  return {kind:'source_hash_mismatch',diagnosticOnly:true,
+    local:{sha256:sha(local),bytes:bytes(local),crlfCount:(local.match(/\r\n/g)||[]).length,
+      hasBom:local.startsWith('\uFEFF'),markers:markers(local)},
+    remote:{sha256:sha(remote),bytes:bytes(remote),crlfCount:(remote.match(/\r\n/g)||[]).length,
+      hasBom:remote.startsWith('\uFEFF'),markers:markers(remote)},
+    equivalentAfter:{lineEndings:lineEndings(local)===lineEndings(remote),
+      trailingWhitespace:trimEnd(local)===trimEnd(remote),
+      sourceMapTrailer:withoutMap(local)===withoutMap(remote),
+      bom:withoutBom(local)===withoutBom(remote),
+      combinedTransportNormalization:canonical(local)===canonical(remote)}};
+}
 function bindings(settings){
   const value=settings?.bindings;
   requireValue(Array.isArray(value)&&value.length>0&&value.length<=100,'worker_bindings_unverified');
@@ -99,7 +135,7 @@ async function sourceText(response,operation='worker_source'){
     headerNames:[...new Set([...response.headers.keys()].map(name=>safeHeaderNames.has(name)?name:'other'))].sort()};
   try{
     const bytes=await boundedBody(response);diagnostic.bytes=bytes.byteLength;
-    try{diagnostic.ownedMarkers=markerFlags(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{}
+    try{diagnostic.ownedMarkers=markerFlags(new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes));}catch{}
     if(['multipart_form_data','multipart_mixed'].includes(diagnostic.contentType)){
       diagnostic.stage='multipart_parse';
       let parts;try{parts=await new Response(bytes,{headers:{'Content-Type':type.replace(/^multipart\/mixed/i,'multipart/form-data')}}).formData();}
@@ -119,7 +155,8 @@ async function sourceText(response,operation='worker_source'){
         // generic field may instead identify its module through File.name.
         const namedModule=/^[A-Za-z0-9._-]+\.m?js(?:\.map)?$/.test(name)||name==='metadata'||name==='metadata.json';
         const filename=typeof part==='string'||namedModule?name:part.name||name;
-        const text=typeof part==='string'?part:await part.text();
+        const text=typeof part==='string'?part:
+          new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(await part.arrayBuffer());
         if(name==='metadata'||filename==='metadata.json'){
           diagnostic.stage='metadata_validation';
           let metadata;try{metadata=JSON.parse(text);}catch{throw new VerifyError('worker_source_unverified');}
@@ -155,7 +192,7 @@ async function sourceText(response,operation='worker_source'){
     diagnostic.stage='content_type';
     requireValue(['javascript_module','javascript','text_plain'].includes(diagnostic.contentType),'worker_source_unverified');
     diagnostic.stage='utf8_decode';
-    try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes);}
+    try{return new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes);}
     catch{throw new VerifyError('worker_source_unverified');}
   }catch(error){
     const failure=error instanceof VerifyError?error:new VerifyError('worker_source_unverified');
@@ -196,7 +233,10 @@ export async function verifyResendWebhookReadOnly({env,source,fetcher=fetch}={})
     const settings=await cf(worker+'/settings',{operation:'worker_settings'}),retained=bindings(settings);
     const remote=await sourceText(await cf(worker+'/content/v2',{raw:true,operation:'worker_source'}),'worker_source');
     requireValue(ownedSource(remote),'worker_ownership_unverified');
-    requireValue(sha(remote)===sha(source),'published_code_hash_mismatch');
+    if(sha(remote)!==sha(source)){
+      const error=new VerifyError('published_code_hash_mismatch',undefined,'worker_source_hash');
+      error.diagnostic=sourceDifference(source,remote);throw error;
+    }
     const subdomain=await cf(worker+'/subdomain',{operation:'worker_subdomain'});
     requireValue(typeof subdomain?.enabled==='boolean'
       &&(subdomain.previews_enabled===undefined||typeof subdomain.previews_enabled==='boolean'),'worker_subdomain_unverified');
