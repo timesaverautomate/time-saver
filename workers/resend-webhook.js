@@ -28,7 +28,7 @@ export async function verifySvix(body, headers, secret, now = Date.now()) {
   const timestamp = headers.get("svix-timestamp");
   const signatures = headers.get("svix-signature");
   if (!id || !timestamp || !signatures || !secret?.startsWith("whsec_")) return false;
-  if (!/^\\d+$/.test(timestamp)) return false;
+  if (!/^\d+$/.test(timestamp)) return false;
   if (Math.abs(now / 1000 - Number(timestamp)) > 300) return false;
   let key;
   try { key = decodeBase64(secret.slice(6)); } catch { return false; }
