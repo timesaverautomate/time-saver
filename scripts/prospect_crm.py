@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Pesquisa B2B TimeSaver: simulação por defeito; escrita manual de até 2 registos."""
+"""Pesquisa B2B TimeSaver: pequenas empresas, rotação geográfica e contactos bloqueados."""
 import json
 import os
 import re
 import time
 import unicodedata
-from datetime import datetime
+from datetime import datetime, date
 from zoneinfo import ZoneInfo
 from urllib.parse import urlsplit, quote
 
@@ -15,14 +15,93 @@ from google.oauth2 import service_account
 
 SID = "1VYEBWJb_9cYGbO8nZa3d_qh1rLUH-H3xf-w4CnOLMS4"
 API = f"https://sheets.googleapis.com/v4/spreadsheets/{SID}"
-CITIES = [
-    ("Porto", 41.1579, -8.6291),
-    ("Lisboa", 38.7223, -9.1393),
-    ("Braga", 41.5454, -8.4265),
-    ("Coimbra", 40.2033, -8.4103),
-    ("Aveiro", 40.6405, -8.6538),
-    ("Faro", 37.0194, -7.9304),
+# Zonas de pesquisa: os raios são aproximados e não substituem a morada real.
+# Prioridade a bairros/subúrbios onde há menos concorrência de abordagens B2B.
+# Formato: (nome da zona, latitude, longitude, raio em metros).
+PORTO_SUBURBS = [
+    ("Matosinhos", 41.1835, -8.6891, 2600),
+    ("Leça da Palmeira", 41.1913, -8.7007, 2300),
+    ("Senhora da Hora", 41.1864, -8.6510, 2300),
+    ("São Mamede de Infesta", 41.2018, -8.6029, 2400),
+    ("Maia", 41.2357, -8.6199, 2800),
+    ("Águas Santas", 41.2119, -8.5750, 2300),
+    ("Ermesinde", 41.2161, -8.5541, 2600),
+    ("Valongo", 41.1880, -8.4987, 2700),
+    ("Rio Tinto", 41.1786, -8.5602, 2500),
+    ("Gondomar", 41.1433, -8.5331, 2600),
+    ("Vila Nova de Gaia", 41.1336, -8.6174, 2700),
+    ("Canidelo", 41.1256, -8.6504, 2400),
+    ("Espinho", 41.0072, -8.6410, 2700),
+    ("Trofa", 41.3382, -8.5607, 2800),
+    ("Santo Tirso", 41.3429, -8.4775, 2700),
+    ("Vila do Conde", 41.3533, -8.7436, 2500),
+    ("Póvoa de Varzim", 41.3827, -8.7627, 2600),
 ]
+LISBON_SUBURBS = [
+    ("Amadora", 38.7536, -9.2302, 2500),
+    ("Odivelas", 38.7927, -9.1838, 2500),
+    ("Loures", 38.8318, -9.1688, 2500),
+    ("Sacavém", 38.7920, -9.1052, 2200),
+    ("Algés", 38.7027, -9.2298, 2300),
+    ("Carnaxide", 38.7274, -9.2416, 2200),
+    ("Oeiras", 38.6910, -9.3104, 2800),
+    ("Queluz", 38.7565, -9.2544, 2300),
+    ("Agualva-Cacém", 38.7701, -9.2980, 2600),
+    ("Sintra", 38.8029, -9.3817, 2700),
+    ("Cascais", 38.6979, -9.4215, 2700),
+    ("Almada", 38.6790, -9.1581, 2600),
+    ("Seixal", 38.6418, -9.1026, 2600),
+    ("Barreiro", 38.6640, -9.0724, 2600),
+]
+REGIONAL_TOWNS = [
+    ("Braga", 41.5454, -8.4265, 2400),
+    ("Vila Verde", 41.6488, -8.4378, 2600),
+    ("Vila Nova de Famalicão", 41.4079, -8.5198, 2800),
+    ("Guimarães", 41.4444, -8.2962, 2600),
+    ("Barcelos", 41.5317, -8.6184, 2600),
+    ("Aveiro", 40.6405, -8.6538, 2400),
+    ("Ílhavo", 40.5994, -8.6680, 2500),
+    ("Águeda", 40.5772, -8.4444, 2600),
+    ("Santa Maria da Feira", 40.9276, -8.5428, 2700),
+    ("Oliveira de Azeméis", 40.8410, -8.4772, 2600),
+    ("Coimbra", 40.2033, -8.4103, 2400),
+    ("Figueira da Foz", 40.1509, -8.8618, 2600),
+    ("Leiria", 39.7436, -8.8071, 2700),
+    ("Viseu", 40.6610, -7.9097, 2700),
+    ("Setúbal", 38.5244, -8.8882, 2600),
+    ("Faro", 37.0194, -7.9304, 2400),
+]
+CITY_CENTRES = [
+    ("Porto", 41.1579, -8.6291, 1900),
+    ("Lisboa", 38.7223, -9.1393, 1900),
+]
+MAX_SEARCH_ZONES = 8
+MAX_PER_ZONE = 5
+
+
+def rotated(pool, offset, count):
+    """Escolha circular e determinística, sem favorecer as primeiras localidades."""
+    start = offset % len(pool)
+    return [pool[(start + index) % len(pool)] for index in range(count)]
+
+
+def search_plan(day=None):
+    """7/8 das pesquisas fora dos centros Porto/Lisboa, com rotação diária."""
+    current = date.fromisoformat(day or today_lisbon())
+    ordinal = current.toordinal()
+    parts = [
+        ("suburbio", rotated(PORTO_SUBURBS, ordinal * 3, 3)),
+        ("suburbio", rotated(LISBON_SUBURBS, ordinal * 2, 2)),
+        ("regional", rotated(REGIONAL_TOWNS, ordinal * 2, 2)),
+        ("centro", rotated(CITY_CENTRES, ordinal, 1)),
+    ]
+    plan = [(name, lat, lon, radius, kind)
+            for kind, locations in parts
+            for name, lat, lon, radius in locations]
+    assert len(plan) == MAX_SEARCH_ZONES
+    return plan
+
+
 ENDPOINTS = (
     "https://overpass.private.coffee/api/interpreter",
     "https://overpass-api.de/api/interpreter",
@@ -43,7 +122,7 @@ GENERIC_LOCAL_PARTS = {
 }
 EMAIL_RE = re.compile(r"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$", re.I)
 MAX_TEST_WRITES = 2
-MAX_DAILY_WRITES = 30
+MAX_DAILY_WRITES = 15
 DAILY_WRITE_APPROVED_IN_CODE = True  # Recolha diaria autorizada; emails permanecem bloqueados
 AUTO_MARKER = 'TSCRM_AUTO_DATE='
 FREE_EMAIL_DOMAINS = {'gmail.com', 'hotmail.com', 'outlook.com', 'live.com', 'yahoo.com', 'icloud.com', 'proton.me'}
@@ -74,7 +153,8 @@ def review_signals(email, website):
 
 
 
-def candidate(element, city):
+def candidate(element, city, zone_type="centro"):
+    """Recolhe apenas caixas genéricas, sem inferir dimensão nem legitimidade legal."""
     tags = element.get("tags") or {}
     name = str(tags.get("name") or "").strip()
     email = str(tags.get("contact:email") or tags.get("email") or "").split(";")[0].strip().lower()
@@ -90,19 +170,30 @@ def candidate(element, city):
     website = str(tags.get("website") or tags.get("contact:website") or "").strip()
     row[0] = name[:180]
     row[1] = str(tags.get("shop") or tags.get("office") or "Empresa")[:70]
-    row[2] = city
+    # Não inventar o município: uma pesquisa radial pode atravessar concelhos.
+    municipality = str(tags.get("addr:city") or "").strip()
+    row[2] = (municipality[:100] if municipality else
+              f"Área de {city} (aproximada)" if zone_type != "centro" else city)
     row[3] = website[:400] if domain(website) else ""
     row[4] = email
     row[5] = str(tags.get("phone") or tags.get("contact:phone") or "")[:80]
-    row[7] = "Hipótese de automação a investigar"
-    row[8] = "Por avaliar"
+    row[7] = "Hipótese a investigar; necessidades internas não verificadas"
     row[9] = "Por contactar"
-    row[11] = "Rever empresa e email antes de qualquer contacto"
+    row[11] = "Confirmar dimensão, morada, empresa, contacto e fundamento legal"
     row[15] = f"https://www.openstreetmap.org/{osm_type}/{osm_id}"
-    row[16] = "OSM público; dados não verificados; " + review_signals(email, row[3])
+    brand = str(tags.get("brand") or "").strip()
+    row[16] = (
+        f"OSM público; dados não verificados; ZONA_PESQUISA={city}; "
+        f"TIPO_ZONA={zone_type}; "
+        + ("Município não confirmado; " if not municipality else "")
+        + ("Marca referida no OSM (rever se é cadeia); " if brand else "")
+        + review_signals(email, row[3])
+    )
     row[23] = "Por avaliar"
-    row[24] = "Sim"  # Bloqueio explícito de contacto até revisão.
+    row[24] = "Sim"  # Sem desbloqueio automático de prospeção.
     row[25] = f"osm:{osm_type}:{osm_id}"
+    score = prospect_score(row)
+    row[8] = "Alta" if score >= 65 else "Média" if score >= 40 else "Baixa"
     return row
 
 
@@ -135,19 +226,24 @@ def is_duplicate(row, keys):
     name, city, email, website_domain, source = identity(row)
     names, emails, domains, sources = keys
     return (
-        (name, city) in names or email in emails or
-        (bool(website_domain) and website_domain in domains) or source in sources
+        (bool(name and city) and (name, city) in names) or
+        (bool(email) and email in emails) or
+        (bool(website_domain) and website_domain in domains) or
+        (bool(source) and source in sources)
     )
 
 
 def mark_seen(row, keys):
     name, city, email, website_domain, source = identity(row)
     names, emails, domains, sources = keys
-    names.add((name, city))
-    emails.add(email)
+    if name and city:
+        names.add((name, city))
+    if email:
+        emails.add(email)
     if website_domain:
         domains.add(website_domain)
-    sources.add(source)
+    if source:
+        sources.add(source)
 
 
 def validate_mode(mode, env):
@@ -228,24 +324,55 @@ REVIEW_HEADERS = [
 
 
 def prospect_score(row):
-    """Pontuação comercial; não representa elegibilidade legal."""
+    """0-100, exclusivamente sinais observáveis; NUNCA autoriza contacto.
+
+    Dimensão desconhecida vale 0 pontos nesse critério, não significa empresa grande.
+    Os valores adicionais DIMENSAO_VERIFICADA e PROCESSO_VALIDADO são revisão humana.
+    """
     sector = norm(row[1] if len(row) > 1 else "")
-    opportunity = norm(row[7] if len(row) > 7 else "")
     website = str(row[3]) if len(row) > 3 else ""
-    email = str(row[4]).lower() if len(row) > 4 else ""
-    priority = norm(row[8] if len(row) > 8 else "")
+    email = str(row[4]).strip().lower() if len(row) > 4 else ""
+    notes = str(row[16]) if len(row) > 16 else ""
     score = 0
-    if any(word in sector for word in ("contab", "accountant", "consult", "insurance", "estate_agent", "imobili")):
-        score += 3
-    if any(word in opportunity for word in ("excel", "reconcil", "relatori", "document", "fatur", "process")):
-        score += 2
-    if priority == "alta":
-        score += 2
-    if domain(website) and email.rsplit("@", 1)[-1] == domain(website):
-        score += 2
-    if not email:
-        score -= 4
-    return max(0, score)
+    # Adequação a serviços que conseguimos entregar.
+    if sector in {"accountant", "estate_agent", "wholesale", "trade"} or any(
+        word in sector for word in ("contab", "imobili", "distribu")
+    ):
+        score += 35
+    elif sector in {"consulting", "insurance", "logistics", "company"}:
+        score += 25
+    elif sector in {"office_supplies", "hardware", "computer", "electronics"}:
+        score += 15
+    else:
+        score += 5
+    # Preferência por zonas menos saturadas; nunca afirmar que a empresa é pequena.
+    if "TIPO_ZONA=suburbio" in notes:
+        score += 25
+    elif "TIPO_ZONA=regional" in notes:
+        score += 20
+    elif "TIPO_ZONA=centro" in notes:
+        score += 5
+    # Contacto técnico observável; não substitui a verificação da titularidade.
+    if EMAIL_RE.fullmatch(email):
+        email_domain = email.rsplit("@", 1)[-1]
+        if domain(website) and email_domain == domain(website):
+            score += 20
+        elif domain(website):
+            score += 5
+    # Evidência adicional só após verificação explícita (nunca deduzida do setor).
+    size = re.search(r"\bDIMENSAO_VERIFICADA=(\d{1,5})\b", notes)
+    if size:
+        employees = int(size.group(1))
+        if 1 <= employees <= 20:
+            score += 15
+        elif employees <= 50:
+            score += 8
+    if "PROCESSO_VALIDADO=Sim" in notes:
+        score += 5
+    # Marca/franquia não prova grande dimensão, mas pede análise adicional.
+    if "Marca referida no OSM" in notes:
+        score -= 10
+    return max(0, min(100, score))
 
 
 def proposal_content(row):
@@ -325,7 +452,7 @@ def review_row(crm_row, line_number):
          "Sem website identificado" if not domain(cell(3)) else
          "Domínio coincide (não verificado)" if cell(4).rsplit("@", 1)[-1].lower() == domain(cell(3))
          else "Domínios diferentes (rever)"),
-        "Por verificar", "", f"Score comercial: {prospect_score(crm_row)}/9; " + draft_proposal(crm_row), str(line_number),
+        "Por verificar", "", f"Score comercial: {prospect_score(crm_row)}/100 (sem validar dimensão); " + draft_proposal(crm_row), str(line_number),
     ]
 
 
@@ -466,31 +593,45 @@ def sync_review(credentials, crm_rows):
 
 
 
-def find_candidates(existing, limit):
+def balanced_candidates(groups, limit):
+    """Distribui o resultado por zonas, em vez de encher o CRM na primeira cidade."""
+    selected = []
+    for position in range(max((len(group) for group in groups), default=0)):
+        for group in groups:
+            if position < len(group):
+                selected.append(group[position])
+                if len(selected) >= limit:
+                    return selected
+    return selected
+
+
+def find_candidates(existing, limit, day=None):
     seen = existing_keys(existing)
-    candidates = []
+    groups = []
     successful, failed = 0, 0
-    for city, lat, lon in CITIES:
-        if len(candidates) >= limit:
-            break
+    plan = search_plan(day)
+    print("Plano de pesquisa: " + "; ".join(
+        f"{name} ({kind})" for name, _, _, _, kind in plan
+    ), flush=True)
+    for city, lat, lon, radius, kind in plan:
         query = (
             '[out:json][timeout:35];('
-            f'nwr(around:12000,{lat},{lon})'
-            '["shop"~"^(computer|electronics|mobile_phone|office_supplies|hardware|pet|furniture)$"]["name"];'
-            f'nwr(around:12000,{lat},{lon})'
-            '["office"~"^(accountant|insurance|estate_agent|consulting|company)$"]["name"];'
-            ');out tags 350;'
+            f'nwr(around:{radius},{lat},{lon})'
+            '["office"~"^(accountant|estate_agent|consulting|insurance|company|logistics)$"]["name"];'
+            f'nwr(around:{radius},{lat},{lon})'
+            '["shop"~"^(wholesale|trade|office_supplies|computer|hardware|electronics|pet)$"]["name"];'
+            ');out tags 250;'
         )
         elements = None
         for endpoint in ENDPOINTS:
             try:
                 response = requests.post(
                     endpoint, data={"data": query},
-                    headers={"User-Agent": "TimeSaverAutomation/1.1 (business research)"},
+                    headers={"User-Agent": "TimeSaverAutomation/1.2 (small business research; timesaverautomate.com)"},
                     timeout=(10, 45),
                 )
                 if response.status_code != 200:
-                    print(f"Fonte {endpoint}; cidade {city}; HTTP {response.status_code}", flush=True)
+                    print(f"Fonte {endpoint}; zona {city}; HTTP {response.status_code}", flush=True)
                     continue
                 data = response.json()
                 if not isinstance(data.get("elements"), list):
@@ -500,22 +641,33 @@ def find_candidates(existing, limit):
                 successful += 1
                 break
             except (requests.RequestException, ValueError) as exc:
-                print(f"Fonte {endpoint}; cidade {city}; erro {type(exc).__name__}", flush=True)
+                print(f"Fonte {endpoint}; zona {city}; erro {type(exc).__name__}", flush=True)
         if elements is None:
             failed += 1
+            groups.append([])
             print(f"Todas as fontes indisponíveis em {city}", flush=True)
             continue
+        local = []
         for element in elements:
-            row = candidate(element, city)
-            if row is None or is_duplicate(row, seen):
+            row = candidate(element, city, kind)
+            if row is not None and not is_duplicate(row, seen):
+                local.append(row)
+        # A fonte não devolve os elementos por potencial comercial.
+        local.sort(key=prospect_score, reverse=True)
+        group = []
+        for row in local:
+            if is_duplicate(row, seen):
                 continue
-            candidates.append(row)
+            group.append(row)
             mark_seen(row, seen)
-            if len(candidates) >= limit:
+            if len(group) >= MAX_PER_ZONE:
                 break
+        groups.append(group)
+        print(f"Zona {city}: {len(group)} candidatos novos para triagem.", flush=True)
         time.sleep(1)
+    candidates = balanced_candidates(groups, limit)
     print(f"Consultas com sucesso: {successful}; falhas: {failed}", flush=True)
-    print(f"Candidatos encontrados: {len(candidates)}", flush=True)
+    print(f"Candidatos encontrados (diversidade geográfica): {len(candidates)}", flush=True)
     if successful == 0:
         raise RuntimeError("Todas as consultas falharam. Nenhum contacto foi guardado.")
     return candidates
@@ -622,17 +774,17 @@ def main():
             print("Quota esgotada; zero escritas e nenhum email.")
             publish_summary(mode, len(existing), 0, 0, "Quota diária atingida")
             return
-        candidates = find_candidates(existing, remaining)
+        candidates = find_candidates(existing, remaining, day=day)
         written = write_candidates(credentials, candidates, remaining, mode, day=day)
         sync_review(credentials, read_rows(credentials))
         publish_summary(mode, len(existing), len(candidates), written)
     elif mode == "teste_escrita_2":
-        candidates = find_candidates(existing, MAX_TEST_WRITES)
+        candidates = find_candidates(existing, MAX_TEST_WRITES, day=day)
         written = write_candidates(credentials, candidates, MAX_TEST_WRITES, mode)
         sync_review(credentials, read_rows(credentials))
         publish_summary(mode, len(existing), len(candidates), written)
     else:
-        candidates = find_candidates(existing, MAX_DAILY_WRITES)
+        candidates = find_candidates(existing, MAX_DAILY_WRITES, day=day)
         print("SIMULAÇÃO: nenhuma escrita e nenhum envio de email.")
         publish_summary(mode, len(existing), len(candidates), 0)
 
