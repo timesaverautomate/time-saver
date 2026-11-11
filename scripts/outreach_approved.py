@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""TimeSaver: envio B2B estritamente aprovado, idempotente e auditável.
+"""TimeSaver: emails apenas para opt-in documentado, idempotentes e auditáveis.
 
-Nunca aprova leads. O único desbloqueio é uma revisão humana documentada no CRM.
+Nunca aprova leads. Resend proíbe cold outreach e exige opt-in documentado.
 O agendamento é serializado pelo mesmo grupo de concorrência da pesquisa.
 """
 import hashlib
@@ -114,6 +114,12 @@ def select_approved(crm_rows, reviews, today=None, limit=MAX_OUTREACH_PER_DAY):
         allowed, reason = crm.evaluate_send_eligibility(row, review, suppression, today=today)
         if not allowed:
             reasons[reason] += 1
+            continue
+        # Resend AUP (13/10/2026): todas as listas devem ter opt-in.
+        # A exceção legal portuguesa para pessoas coletivas NÃO é permissão
+        # contratual do Resend para prospeção a frio.
+        if text_cell(review, 9) != "Consentimento documentado":
+            reasons["Resend exige opt-in; cold outreach proibido"] += 1
             continue
         email = text_cell(row, 4).lower()
         business_domain = crm.domain(text_cell(row, 3))
