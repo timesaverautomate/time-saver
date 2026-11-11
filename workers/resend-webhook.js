@@ -147,14 +147,21 @@ export async function googleToken(json, http = fetch) {
 }
 export function planCrmEvent(rows,event) {
   const states = {"email.sent":"Enviado","email.delivered":"Entregue","email.bounced":"Bounce","email.complained":"Spam","email.delivery_delayed":"Entrega atrasada","email.failed":"Erro"};
-  const matches = [];
+  if (!states[event?.type] || typeof event?.data?.email_id !== "string") throw Error("invalid_crm_event");
+  const matches=[];
   for(let i=1;i<rows.length;i++) if(String(rows[i]?.[22]??"").trim()===event.data.email_id) matches.push(i+1);
   if(matches.length>1) throw Error("duplicate_message_id");
-  if(!matches.length) return {matched:false,planned_cells:0};
-  const row=rows[matches[0]-1], current=String(row[21]??"").trim(), next=states[event.type];
+  if(!matches.length) return {matched:false,planned_cells:0,updates:[]};
+  const number=matches[0], row=rows[number-1],current=String(row[21]??"").trim(),next=states[event.type];
   const blocked=new Set(["Bounce","Spam","Cancelou subscrição"]);
-  if(blocked.has(current)&&!blocked.has(next)) return {matched:true,planned_cells:0};
-  return {matched:true,planned_cells:Number(current!==next)+Number(blocked.has(next)&&String(row[24]??"").trim().toLowerCase()!=="sim")};
+  // Terminal delivery states cannot be reverted by late or replayed events.
+  if(blocked.has(current)&&!blocked.has(next)) return {matched:true,planned_cells:0,updates:[]};
+  if(current==="Entregue"&&["Enviado","Entrega atrasada"].includes(next)) return {matched:true,planned_cells:0,updates:[]};
+  const updates=[];
+  if(current!==next) updates.push({range:"'Pedidos'!V"+number,values:[[next]]});
+  if(blocked.has(next)&&String(row[24]??"").trim().toLowerCase()!=="sim")
+    updates.push({range:"'Pedidos'!Y"+number,values:[["Sim"]]});
+  return {matched:true,planned_cells:updates.length,updates};
 }
 export async function checkCrm(json,event,http=fetch) {
   const token=await googleToken(json,http);
@@ -163,7 +170,8 @@ export async function checkCrm(json,event,http=fetch) {
   if(!r.ok) throw Error("google_sheet_read_failed");
   const data=await r.json();
   if(!Array.isArray(data.values)||data.values[0]?.[22]!=="ID mensagem Resend") throw Error("crm_schema_mismatch");
-  return planCrmEvent(data.values,event);
+  const {updates, ...summary}=planCrmEvent(data.values,event);
+  return summary;
 }
 
 export default {
