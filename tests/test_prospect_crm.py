@@ -88,26 +88,25 @@ class ProspectCrmTests(unittest.TestCase):
         without_email[4] = ""
         self.assertLess(crm.prospect_score(without_email), crm.prospect_score(row))
 
-    def test_sector_proposals_are_distinct_and_not_sent(self):
-        accounting = crm.candidate(sample(), "Porto")
-        accounting[1] = "accountant"
-        retail = list(accounting)
-        retail[1] = "computer"
-        a_subject, a_body = crm.proposal_content(accounting)
-        r_subject, r_body = crm.proposal_content(retail)
-        self.assertNotEqual(a_subject, r_subject)
-        self.assertIn("reconciliações", a_body)
-        self.assertIn("stock", r_body)
-        self.assertIn("Não sabemos", a_body)
-        self.assertIn("RASCUNHO NÃO ENVIADO", crm.draft_proposal(accounting))
-        self.assertEqual(accounting[24], "Sim")
+    def test_approved_commercial_email_is_not_sent(self):
+        row = crm.candidate(sample(), "Porto")
+        subject, body = crm.proposal_content(row)
+        self.assertEqual(subject, "TimeSaver | Poupe tempo e reduza custos com automação")
+        self.assertIn("tratamento automático de faturas", body)
+        self.assertIn("gestão de emails", body)
+        self.assertIn("ficheiros Excel", body)
+        self.assertIn("Entre outros processos administrativos", body)
+        self.assertIn("breve reunião, sem compromisso", body)
+        self.assertIn("RASCUNHO NÃO ENVIADO", crm.draft_proposal(row))
+        self.assertEqual(row[24], "Sim")
+
 
     def test_resend_preview_is_only_data(self):
         row = crm.candidate(sample(), "Porto")
         row[1] = "accountant"
         preview = crm.build_resend_preview(row)
         self.assertEqual(preview["to"], "geral@alfa.pt")
-        self.assertIn("contabilidade", preview["subject"])
+        self.assertIn("Poupe tempo e reduza custos", preview["subject"])
         self.assertIn("reconciliações", preview["text"])
         self.assertEqual(preview["status"], "SIMULADO — NÃO ENVIADO")
         self.assertEqual(row[24], "Sim")
