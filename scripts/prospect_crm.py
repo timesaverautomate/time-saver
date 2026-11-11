@@ -266,6 +266,40 @@ def draft_proposal(row):
 
 
 
+
+SEND_ELIGIBILITY_LABEL = "Elegível para envio"
+VALID_LEGAL_BASES = {"Consentimento documentado", "Pessoa coletiva - fundamento validado"}
+
+
+def evaluate_send_eligibility(crm_row, review_row, suppressed_emails=()):
+    """Fail closed: critérios técnicos e base legal explícita, nunca apenas score."""
+    def value(row, index):
+        return str(row[index]).strip() if len(row) > index else ""
+    email = value(crm_row, 4).lower()
+    website = value(crm_row, 3)
+    if value(crm_row, 24).casefold() == "sim":
+        return False, "Bloqueio Não contactar no CRM"
+    if value(review_row, 8) != "Verificado":
+        return False, "Revisão não concluída"
+    if value(review_row, 9) not in VALID_LEGAL_BASES:
+        return False, "Base legal não documentada"
+    if not EMAIL_RE.fullmatch(email):
+        return False, "Email inválido"
+    local, email_domain = email.rsplit("@", 1)
+    if email in {str(e).lower() for e in suppressed_emails}:
+        return False, "Oposição ou supressão"
+    if local not in GENERIC_LOCAL_PARTS or email_domain in FREE_EMAIL_DOMAINS:
+        return False, "Contacto não é caixa empresarial genérica"
+    if not domain(website) or domain(website) != email_domain:
+        return False, "Domínio da empresa não confirmado"
+    if value(crm_row, 20) not in ("", "0"):
+        return False, "Contacto já abordado"
+    if value(crm_row, 21) in ("Bounce", "Cancelou subscrição", "Erro"):
+        return False, "Estado Resend impede contacto"
+    return True, SEND_ELIGIBILITY_LABEL
+
+
+
 def review_row(crm_row, line_number):
     def cell(index):
         return str(crm_row[index]) if len(crm_row) > index else ""
