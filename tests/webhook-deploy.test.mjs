@@ -21,7 +21,9 @@ const originalBindings=()=>[
 function fixture({missingWorker=false,remoteSource=SOURCE,multipart=false,subdomainEnabled=true,
   domains=[{service:WORKER,hostname:'events.timesaverautomate.com'}],accountCount=1,
   settingsChanged=false,sourceChanged=false,bindingsChanged=false,subdomainChanged=false,
-  storedSourceChanged=false,uploadStatus=200,healthExtra=false,unsignedStatus=401,mutateBindings}={}){
+  storedSourceChanged=false,uploadStatus=200,healthExtra=false,unsignedStatus=401,mutateBindings,
+  genericField=false,sourceMap=false,badSourceMap=false,extraModule=false,mixed=false,
+  sourceContentType='application/javascript+module',responseHeaderSecret=false,genericFilename=false}={}){
   const calls=[],uploads=[];
   const env={GITHUB_ACTIONS:'true',GITHUB_REPOSITORY_ID:PROJECT,GITHUB_REPOSITORY:'timesaverautomate/time-saver',
     GITHUB_REF:'refs/heads/main',GITHUB_SHA:'1'.repeat(40),GITHUB_RUN_ID:'12345',GITHUB_EVENT_NAME:'push',
@@ -63,8 +65,15 @@ function fixture({missingWorker=false,remoteSource=SOURCE,multipart=false,subdom
     if(path===base+'/content/v2'){
       sourceReads++;
       const text=(sourceChanged&&sourceReads===2)||(storedSourceChanged&&uploads.length)?content+'\n// changed':content;
-      if(multipart){const form=new FormData();form.set('worker.mjs',new Blob([text],{type:'application/javascript+module'}),'worker.mjs');return new Response(form);}
-      return new Response(text,{headers:{'Content-Type':'application/javascript+module'}});
+      if(multipart){
+        const form=new FormData();form.set(genericField?'script':'worker.mjs',new Blob([text],{type:'application/javascript+module'}),genericFilename?'blob':'worker.mjs');
+        if(sourceMap)form.set('source-map',new Blob([JSON.stringify({version:badSourceMap?2:3,file:'worker.mjs',sources:['private-original-file.js'],sourcesContent:[text],names:[],mappings:''})],{type:'application/json'}),'worker.mjs.map');
+        if(extraModule)form.set('extra.js',new Blob(['export default "private-extra-module"'],{type:'application/javascript+module'}),'extra.js');
+        const response=new Response(form);
+        if(mixed)response.headers.set('Content-Type',response.headers.get('Content-Type').replace('multipart/form-data','multipart/mixed'));
+        return response;
+      }
+      return new Response(text,{headers:{'Content-Type':sourceContentType,...(responseHeaderSecret?{'x-private-debug':'private-header-value'}:{})}});
     }
     if(path===base+'/subdomain'){
       assert.equal(options.method,'GET');return json({...subdomain,...(subdomainChanged&&uploads.length?{enabled:!subdomain.enabled}:{})});
@@ -194,4 +203,34 @@ test('workflow has repository guard, pinned actions, read-only permissions and s
   assert.ok(workflow.indexOf('audit-repository-secrets.py')<workflow.indexOf('CLOUDFLARE_API_TOKEN:'));
   assert.match(workflow,/secrets.CLOUDFLARE_SITE_API_TOKEN \|\| secrets.CLOUDFLARE_API_TOKEN/);
   assert.doesNotMatch(workflow,/RESEND_API_KEY|GOOGLE_SERVICE_ACCOUNT_JSON|GITHUB_TOKEN/);
+});
+
+test('Cloudflare multipart main module is selected by File.name with a generic field and matching validated source map',async()=>{
+  for(const mixed of [false,true]){
+    const f=fixture({multipart:true,genericField:true,sourceMap:true,mixed});
+    assert.equal((await deployResendWebhook(f.options)).verified,true);assert.equal(f.uploads[0].source,SOURCE);
+  }
+  const namedField=fixture({multipart:true,genericFilename:true});
+  assert.equal((await deployResendWebhook(namedField.options)).verified,true);
+});
+
+test('malformed maps and multiple code modules fail closed before upload with classified diagnostics only',async()=>{
+  for(const setup of [{multipart:true,genericField:true,sourceMap:true,badSourceMap:true},{multipart:true,extraModule:true}]){
+    const f=fixture(setup),r=await deployResendWebhook(f.options);
+    assert.equal(r.installed,false);assert.equal(r.code,'worker_source_unverified');assert.equal(f.uploads.length,0);
+    assert.equal(r.operation,'worker_source');assert.equal(r.diagnostic.contentType,'multipart_form_data');
+    assert.ok(r.diagnostic.bytes>0);assert.ok(r.diagnostic.partCount>=2);assert.ok(Array.isArray(r.diagnostic.parts));
+    assert.equal(r.diagnostic.ownedMarkers.svix,true);assert.equal(r.diagnostic.ownedMarkers.crmId,true);
+    const output=JSON.stringify(r);assert.ok(!output.includes(SOURCE));assert.ok(!output.includes('private-original-file'));
+    assert.ok(!output.includes('private-extra-module'));assert.ok(!output.includes(f.env.CLOUDFLARE_API_TOKEN));
+  }
+});
+
+test('unsupported content types expose category, byte count and marker booleans but never type parameters or header values',async()=>{
+  const f=fixture({sourceContentType:'application/octet-stream; private=private-content-type-value',responseHeaderSecret:true});
+  const r=await deployResendWebhook(f.options);assert.equal(r.installed,false);assert.equal(f.uploads.length,0);
+  assert.equal(r.code,'worker_source_unverified');assert.equal(r.diagnostic.stage,'content_type');assert.equal(r.diagnostic.contentType,'octet_stream');
+  assert.ok(r.diagnostic.headerNames.includes('content-type'));assert.ok(r.diagnostic.headerNames.includes('other'));
+  assert.equal(r.diagnostic.ownedMarkers.svix,true);assert.equal(r.diagnostic.ownedMarkers.coordinator,true);
+  const output=JSON.stringify(r);for(const value of ['private-header-value','private-content-type-value','x-private-debug',SOURCE])assert.ok(!output.includes(value));
 });

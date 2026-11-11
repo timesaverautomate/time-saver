@@ -60,23 +60,94 @@ async function boundedBody(response){
   for(const part of chunks){bytes.set(part,offset);offset+=part.byteLength;}
   return bytes;
 }
-async function sourceText(response){
-  const bytes=await boundedBody(response),type=response.headers.get('Content-Type')||'';
-  if(/^multipart\/form-data\b/i.test(type)){
-    let parts;try{parts=await new Response(bytes,{headers:{'Content-Type':type}}).formData();}
-    catch{throw new DeployError('worker_source_unverified');}
-    const modules=[];
-    for(const [name,part]of parts){
-      if(name==='metadata')continue;
-      requireValue(/^[A-Za-z0-9._-]+\.m?js$/.test(name),'worker_source_unverified');
-      modules.push(typeof part==='string'?part:await part.text());
+function contentKind(type){
+  const mime=String(type||'').split(';',1)[0].trim().toLowerCase();
+  return ({'multipart/form-data':'multipart_form_data','multipart/mixed':'multipart_mixed',
+    'application/javascript+module':'javascript_module','application/javascript':'javascript',
+    'application/x-javascript':'javascript','text/javascript':'javascript','text/plain':'text_plain',
+    'application/json':'json','application/octet-stream':'octet_stream','application/source-map':'source_map'})[mime]
+    ||(mime?'other':'missing');
+}
+function extensionKind(name){
+  const extension=String(name||'').match(/\.([A-Za-z0-9]+)$/)?.[1]?.toLowerCase();
+  return ['js','mjs','map','json'].includes(extension)?extension:extension?'other':'none';
+}
+function markerFlags(source){
+  return {svix:/\bverifySvix(?:Detailed)?\b/.test(source),coordinator:/\bCrmEventCoordinator\b/.test(source),
+    crmId:source.includes(CRM_ID),webhookRoute:source.includes('/webhooks/resend'),
+    defaultExport:/export\s+default\b|export\s*\{[^}]*\bas\s+default\b/s.test(source),
+    importsPresent:/^\s*import\b/m.test(source)};
+}
+async function sourceText(response,operation='worker_source'){
+  const type=response.headers.get('Content-Type')||'';
+  const safeHeaderNames=new Set(['content-type','content-length','content-disposition','content-encoding',
+    'transfer-encoding','cache-control','date','server','etag','last-modified','vary','cf-ray','x-content-type-options']);
+  const diagnostic={stage:'body_read',contentType:contentKind(type),bytes:0,
+    headerNames:[...new Set([...response.headers.keys()].map(name=>safeHeaderNames.has(name)?name:'other'))].sort()};
+  try{
+    const bytes=await boundedBody(response);diagnostic.bytes=bytes.byteLength;
+    try{diagnostic.ownedMarkers=markerFlags(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{}
+    if(['multipart_form_data','multipart_mixed'].includes(diagnostic.contentType)){
+      diagnostic.stage='multipart_parse';
+      let parts;try{parts=await new Response(bytes,{headers:{'Content-Type':type.replace(/^multipart\/mixed/i,'multipart/form-data')}}).formData();}
+      catch{throw new DeployError('worker_source_unverified');}
+      const entries=[...parts];diagnostic.partCount=entries.length;
+      diagnostic.parts=entries.map(([name,part])=>({
+        fieldKind:name==='metadata'?'metadata':extensionKind(name),
+        fileExtension:typeof part==='string'?'none':extensionKind(part.name),
+        kind:typeof part==='string'?'text':'file',
+        contentType:typeof part==='string'?'text':contentKind(part.type)
+      }));
+      diagnostic.stage='module_selection';
+      const modules=[],maps=[];let mainModule;
+      for(const [name,part]of entries){
+        diagnostic.stage='part_name';
+        // Multipart field names identify modules in the upload API. A downloaded
+        // generic field may instead identify its module through File.name.
+        const namedModule=/^[A-Za-z0-9._-]+\.m?js(?:\.map)?$/.test(name)||name==='metadata'||name==='metadata.json';
+        const filename=typeof part==='string'||namedModule?name:part.name||name;
+        const text=typeof part==='string'?part:await part.text();
+        if(name==='metadata'||filename==='metadata.json'){
+          diagnostic.stage='metadata_validation';
+          let metadata;try{metadata=JSON.parse(text);}catch{throw new DeployError('worker_source_unverified');}
+          if(metadata.main_module!==undefined){
+            requireValue(typeof metadata.main_module==='string'&&/^[A-Za-z0-9._-]+\.m?js$/.test(metadata.main_module),'worker_source_unverified');
+            mainModule=metadata.main_module;
+          }
+          continue;
+        }
+        if(/^[A-Za-z0-9._-]+\.m?js$/.test(filename)){modules.push({name:filename,text});continue;}
+        if(/^[A-Za-z0-9._-]+\.m?js\.map$/.test(filename)){
+          diagnostic.stage='source_map_validation';
+          let map;try{map=JSON.parse(text);}catch{throw new DeployError('worker_source_unverified');}
+          requireValue(map?.version===3&&Array.isArray(map.sources)&&map.sources.every(x=>typeof x==='string')
+            &&typeof map.mappings==='string'
+            &&(map.file===undefined||typeof map.file==='string'),'worker_source_unverified');
+          maps.push({name:filename,file:map.file});continue;
+        }
+        throw new DeployError('worker_source_unverified');
+      }
+      diagnostic.stage='module_count';
+      diagnostic.moduleCount=modules.length;
+      diagnostic.mainModuleMatches=mainModule===undefined||modules.some(module=>module.name===mainModule);
+      requireValue(modules.length===1&&(!mainModule||mainModule===modules[0].name),'worker_source_unverified');
+      diagnostic.stage='source_map_match';
+      diagnostic.sourceMapsMatch=maps.every(map=>map.name===modules[0].name+'.map'
+        &&(!map.file||map.file===modules[0].name));
+      requireValue(maps.every(map=>map.name===modules[0].name+'.map'
+        &&(!map.file||map.file===modules[0].name)),'worker_source_unverified');
+      diagnostic.ownedMarkers=markerFlags(modules[0].text);
+      return modules[0].text;
     }
-    requireValue(modules.length===1,'worker_source_unverified');return modules[0];
+    diagnostic.stage='content_type';
+    requireValue(['javascript_module','javascript','text_plain'].includes(diagnostic.contentType),'worker_source_unverified');
+    diagnostic.stage='utf8_decode';
+    try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes);}
+    catch{throw new DeployError('worker_source_unverified');}
+  }catch(error){
+    const failure=error instanceof DeployError?error:new DeployError('worker_source_unverified');
+    failure.operation=operation;failure.diagnostic=diagnostic;throw failure;
   }
-  requireValue(/^(?:application\/(?:javascript(?:\+module)?|x-javascript)|text\/(?:javascript|plain))(?:;|$)/i.test(type),
-    'worker_source_unverified');
-  try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes);}
-  catch{throw new DeployError('worker_source_unverified');}
 }
 // API documentation: https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/update/
 // Every existing binding is inherited by name with bindings_inherit=strict. This
@@ -122,7 +193,7 @@ export async function deployResendWebhook({env,source,fetcher=fetch,sleep=ms=>ne
     requireValue(/^\d{4}-\d{2}-\d{2}$/.test(settings.compatibility_date||''),'worker_settings_unverified');
     requireValue(settings.compatibility_flags===undefined||Array.isArray(settings.compatibility_flags)
       &&settings.compatibility_flags.every(v=>typeof v==='string'),'worker_settings_unverified');
-    const previousSource=await sourceText(await cf(worker+'/content/v2',{raw:true,operation:'worker_source'}));
+    const previousSource=await sourceText(await cf(worker+'/content/v2',{raw:true,operation:'worker_source'}),'worker_source');
     requireValue(ownedSource(previousSource),'worker_ownership_unverified');
     const subdomain=await cf(worker+'/subdomain',{operation:'worker_subdomain'});
     requireValue(typeof subdomain?.enabled==='boolean'
@@ -142,7 +213,7 @@ export async function deployResendWebhook({env,source,fetcher=fetch,sleep=ms=>ne
     }
     // A concurrent operator must not be overwritten based on an obsolete read.
     const recent=await cf(worker+'/settings',{operation:'worker_settings_recheck'});
-    const recentSource=await sourceText(await cf(worker+'/content/v2',{raw:true,operation:'worker_source_recheck'}));
+    const recentSource=await sourceText(await cf(worker+'/content/v2',{raw:true,operation:'worker_source_recheck'}),'worker_source_recheck');
     requireValue(same(settings,recent)&&sha(previousSource)===sha(recentSource),'worker_changed_during_preflight');
     const form=new FormData();
     const metadata={main_module:'worker.mjs',compatibility_date:settings.compatibility_date,
@@ -163,7 +234,7 @@ export async function deployResendWebhook({env,source,fetcher=fetch,sleep=ms=>ne
     }
     const currentSubdomain=await cf(worker+'/subdomain',{operation:'verify_subdomain'});
     requireValue(same(subdomain,currentSubdomain),'worker_subdomain_changed');
-    const published=await sourceText(await cf(worker+'/content/v2',{raw:true,operation:'verify_source'}));
+    const published=await sourceText(await cf(worker+'/content/v2',{raw:true,operation:'verify_source'}),'verify_source');
     requireValue(ownedSource(published)&&sha(published)===sha(source),'worker_source_unverified');
     let healthy=false;
     for(let i=0;i<attempts;i++){
@@ -189,7 +260,8 @@ export async function deployResendWebhook({env,source,fetcher=fetch,sleep=ms=>ne
     return {installed,verified:true,code:'webhook_security_verified',sourceSha256:sha(source),
       bindingsRetained:originalBindings.length,workersDevStatePreserved:true,unauthenticatedEventRejected:true};
   }catch(error){return {installed,verified:false,code:error instanceof DeployError?error.code:'webhook_deployment_failed',
-    ...(error instanceof DeployError&&error.httpStatus?{httpStatus:error.httpStatus,operation:error.operation}:{} )};}
+    ...(error instanceof DeployError&&error.httpStatus?{httpStatus:error.httpStatus,operation:error.operation}:{} ),
+    ...(error instanceof DeployError&&error.diagnostic?{operation:error.operation,diagnostic:error.diagnostic}:{})};}
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
