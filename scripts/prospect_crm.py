@@ -319,6 +319,10 @@ REVIEW_HEADERS = [
     "Empresa", "Setor", "Localidade", "Website", "Email comercial",
     "Prioridade", "Fonte pública", "Triagem automática", "Estado de revisão",
     "Base legal / autorização", "Observações da revisão", "Linha CRM",
+    "Natureza jurídica", "Consulta DGC (AAAA-MM-DD)",
+    "Email confirmado (AAAA-MM-DD)", "Fonte de validação",
+    "Autorização de envio", "Gancho comercial verificado",
+    "Data aprovação (AAAA-MM-DD)",
 ]
 
 
@@ -375,29 +379,38 @@ def prospect_score(row):
     return max(0, min(100, score))
 
 
-def proposal_content(row):
-    """Email comercial base aprovado, com exemplos concretos e sem envio."""
-    name = str(row[0]).strip()[:80] if row else ""
+def proposal_content(row, verified_hook=""):
+    """Rascunho de abordagem sem atribuir problemas não comprovados ao destinatário."""
+    name = str(row[0]).strip()[:75] if row else ""
+    sector = norm(row[1]) if len(row) > 1 else ""
+    if any(x in sector for x in ("contab", "accountant")):
+        examples = "reconciliações, tratamento de documentos e mapas Excel"
+    elif any(x in sector for x in ("imobili", "estate_agent")):
+        examples = "organização de contactos, gestão de pedidos e relatórios"
+    elif any(x in sector for x in ("distribu", "wholesale", "trade", "logistics")):
+        examples = "tratamento de encomendas, atualização de inventário e relatórios"
+    else:
+        examples = "organização de documentos, atualização de Excel e relatórios"
     subject = "TimeSaver | Poupe tempo e reduza custos com automação"
-    greeting = "Bom dia," if not name else f"Bom dia, equipa {name},"
+    hook = re.sub(r"[\r\n\t]+", " ", str(verified_hook or "")).strip()[:160]
+    particular = (
+        f"Vimos na vossa informação pública a referência a {hook}. "
+        "Gostaríamos de perceber se existem processos associados que faça sentido simplificar.\n\n"
+        if hook else ""
+    )
     body = (
-        greeting + "\n\n"
-        "Somos a TimeSaver, uma empresa especializada na automatização de processos empresariais.\n\n"
-        "Ajudamos empresas a reduzir o tempo gasto em tarefas repetitivas, como:\n\n"
-        "- Receção, organização e tratamento automático de faturas;\n"
-        "- Organização e gestão de emails através de regras e automatizações;\n"
-        "- Reconciliações e atualização automática de ficheiros Excel;\n"
-        "- Elaboração de relatórios e tratamento de documentos;\n"
-        "- Entre outros processos administrativos.\n\n"
-        "O nosso objetivo é simples: poupar tempo, reduzir custos e libertar a equipa "
-        "para tarefas de maior valor.\n\n"
-        "Gostaríamos de perceber se existem processos na vossa empresa que possam "
-        "ser simplificados ou automatizados.\n\n"
-        "Teriam disponibilidade para uma breve reunião, sem compromisso, "
-        "para explorarmos possíveis oportunidades?\n\n"
-        "Em alternativa, podem visitar o nosso site e solicitar diretamente um "
-        "orçamento, sem compromisso:\n\n"
+        (f"Bom dia, equipa {name}," if name else "Bom dia,") + "\n\n"
+        "Somos a TimeSaver e ajudamos pequenas empresas a reduzir tarefas "
+        "administrativas repetitivas através de automatizações adaptadas "
+        "às ferramentas que já utilizam.\n\n"
+        + particular +
+        "Alguns exemplos de processos que podemos ajudar a automatizar incluem "
+        + examples + ". Não sabemos se estes processos representam uma necessidade "
+        "na vossa empresa; gostaríamos precisamente de o perceber.\n\n"
+        "Faria sentido uma breve conversa, sem compromisso?\n\n"
         "https://timesaverautomate.com\n\n"
+        "Se não quiserem receber novos contactos comerciais da TimeSaver, "
+        "basta responder «Não contactar» a esta mensagem.\n\n"
         "Cumprimentos,\nEquipa TimeSaver"
     )
     return subject, body
@@ -414,18 +427,30 @@ SEND_ELIGIBILITY_LABEL = "Elegível para envio"
 VALID_LEGAL_BASES = {"Consentimento documentado", "Pessoa coletiva - fundamento validado"}
 
 
-def evaluate_send_eligibility(crm_row, review_row, suppressed_emails=()):
-    """Fail closed: critérios técnicos e base legal explícita, nunca apenas score."""
+def recent_date(value, today, max_age_days):
+    """Uma data humana escrita no CRM, validada sem aceitar futuro."""
+    try:
+        d = date.fromisoformat(str(value or "").strip())
+    except ValueError:
+        return False
+    age = (today - d).days
+    return 0 <= age <= max_age_days
+
+
+def evaluate_send_eligibility(crm_row, review_row, suppressed_emails=(), today=None):
+    """Fail closed: aprovação explícita, evidências recentes e sem oposição."""
     def value(row, index):
         return str(row[index]).strip() if len(row) > index else ""
+    today = today or datetime.now(ZoneInfo("Europe/Lisbon")).date()
     email = value(crm_row, 4).lower()
     website = value(crm_row, 3)
     if value(crm_row, 24).casefold() == "sim":
         return False, "Bloqueio Não contactar no CRM"
     if value(review_row, 8) != "Verificado":
         return False, "Revisão não concluída"
-    if value(review_row, 9) not in VALID_LEGAL_BASES:
-        return False, "Base legal não documentada"
+    basis = value(review_row, 9)
+    if basis not in VALID_LEGAL_BASES or value(crm_row, 23) != basis:
+        return False, "Base legal não documentada de forma consistente"
     if not EMAIL_RE.fullmatch(email):
         return False, "Email inválido"
     local, email_domain = email.rsplit("@", 1)
@@ -435,12 +460,31 @@ def evaluate_send_eligibility(crm_row, review_row, suppressed_emails=()):
         return False, "Contacto não é caixa empresarial genérica"
     if not domain(website) or domain(website) != email_domain:
         return False, "Domínio da empresa não confirmado"
-    if value(crm_row, 20) not in ("", "0"):
+    if value(crm_row, 20) not in ("", "0") or value(crm_row, 22):
         return False, "Contacto já abordado"
-    if value(crm_row, 21) in ("Bounce", "Cancelou subscrição", "Erro"):
-        return False, "Estado Resend impede contacto"
+    if value(crm_row, 21):
+        return False, "Estado Resend exige confirmação"
+    if len(review_row) < len(REVIEW_HEADERS):
+        return False, "Campos de aprovação em falta"
+    if (value(review_row, 11) == "" or
+        value(review_row, 0) != value(crm_row, 0) or
+        value(review_row, 4).lower() != email or
+        domain(value(review_row, 3)) != domain(website)):
+        return False, "Revisão não corresponde à empresa/email"
+    if value(review_row, 16) != "Aprovado":
+        return False, "Aprovação de envio pendente"
+    if not recent_date(value(review_row, 18), today, 30):
+        return False, "Aprovação de envio desatualizada"
+    if not recent_date(value(review_row, 14), today, 90):
+        return False, "Confirmação de email desatualizada"
+    if not value(review_row, 15):
+        return False, "Fonte de validação em falta"
+    if basis == "Pessoa coletiva - fundamento validado":
+        if value(review_row, 12) != "Pessoa coletiva":
+            return False, "Natureza jurídica não confirmada"
+        if not recent_date(value(review_row, 13), today, 31):
+            return False, "Consulta DGC não documentada ou desatualizada"
     return True, SEND_ELIGIBILITY_LABEL
-
 
 
 def review_row(crm_row, line_number):
@@ -453,6 +497,7 @@ def review_row(crm_row, line_number):
          "Domínio coincide (não verificado)" if cell(4).rsplit("@", 1)[-1].lower() == domain(cell(3))
          else "Domínios diferentes (rever)"),
         "Por verificar", "", f"Score comercial: {prospect_score(crm_row)}/100 (sem validar dimensão); " + draft_proposal(crm_row), str(line_number),
+        "", "", "", "", "", "", "",
     ]
 
 
@@ -504,7 +549,7 @@ def unique_send_candidates(rows):
 def simulate_resend(credentials, crm_rows, limit=30):
     """Simulação integral de elegibilidade e payload Resend; sem chamadas à Resend."""
     response = requests.get(
-        f"{API}/values/{quote(chr(39) + 'Revisão Comercial' + chr(39) + '!A1:L10000', safe='')}",
+        f"{API}/values/{quote(chr(39) + 'Revisão Comercial' + chr(39) + '!A1:S10000', safe='')}",
         headers={"Authorization": "Bearer " + credentials.token},
         timeout=30,
     )
@@ -520,7 +565,7 @@ def simulate_resend(credentials, crm_rows, limit=30):
         if not crm_row or not crm_row[0]:
             continue
         review = review_by_line.get(str(line))
-        if not review or norm(review[0]) != norm(crm_row[0]):
+        if not review or norm(review[0]) != norm(crm_row[0]) or (len(review) > 4 and str(review[4]).strip().lower() != str(crm_row[4]).strip().lower()):
             reason = "Revisão ausente ou não corresponde ao CRM"
             allowed = False
         else:
@@ -579,7 +624,7 @@ def sync_review(credentials, crm_rows):
         print("Revisão Comercial sincronizada: zero novas linhas.")
         return 0
     result = requests.post(
-        f"{API}/values/{quote(chr(39) + 'Revisão Comercial' + chr(39) + '!A:L', safe='')}:append",
+        f"{API}/values/{quote(chr(39) + 'Revisão Comercial' + chr(39) + '!A:S', safe='')}:append",
         params={"valueInputOption": "RAW", "insertDataOption": "INSERT_ROWS"},
         headers={"Authorization": "Bearer " + credentials.token},
         json={"values": additions},
