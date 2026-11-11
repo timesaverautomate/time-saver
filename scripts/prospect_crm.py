@@ -336,6 +336,19 @@ def review_row(crm_row, line_number):
 
 
 
+
+def build_resend_preview(row):
+    """Representação local do email; nunca chama a API Resend."""
+    subject, body = proposal_content(row)
+    return {
+        "to": str(row[4]).strip().lower(),
+        "subject": subject,
+        "text": body,
+        "status": "SIMULADO — NÃO ENVIADO",
+    }
+
+
+
 def simulate_resend(credentials, crm_rows, limit=30):
     """Simulação integral de elegibilidade e payload Resend; sem chamadas à Resend."""
     response = requests.get(
@@ -370,7 +383,8 @@ def simulate_resend(credentials, crm_rows, limit=30):
         print(f"Bloqueados — {reason}: {count}")
     for score, row in selected:
         # Preview sem expor emails nos logs de execução.
-        print(f"Proposta simulada: score={score}; setor={str(row[1])[:70]}; assunto=TimeSaver — oportunidades de automação")
+        preview = build_resend_preview(row)
+        print(f"Proposta simulada: score={score}; setor={str(row[1])[:70]}; assunto={preview['subject']}; estado={preview['status']}")
     path = os.environ.get("GITHUB_STEP_SUMMARY")
     if path:
         with open(path, "a", encoding="utf-8") as handle:
