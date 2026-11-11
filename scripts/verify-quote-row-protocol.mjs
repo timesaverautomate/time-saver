@@ -12,6 +12,12 @@ export async function verifyQuoteAtomicProvider({env=process.env,fetcher=fetch,a
   if(!allowed(env))return {verified:false,code:'atomic_probe_context_invalid'};
   let access,created=false,removed=false,sheetId,title;
   let result={verified:false,code:'atomic_probe_unavailable'};
+  const diagnostic={stage:'context',locale:'unavailable',rowCount:0,rowLengths:[],formulaStatus:'not_read',
+    headerMatches:false,referenceMatches:false,contentMismatchColumns:[],trailingEmptyCellIncluded:false,
+    originalFormulaMatches:false,originalFormulaErrorType:'unavailable',
+    alternativeFormulaAccepted:false,alternativeFormulaStatus:'not_tested'};
+  const statusClass=value=>['Pendente envio','Novo','Em análise','#ERROR!','#REF!','#VALUE!','#NAME?','#N/A','#DIV/0!','#NUM!'].includes(value)
+    ?value:value===undefined||value===null||value===''?'empty':typeof value==='number'?'number':typeof value==='boolean'?'boolean':'other';
   async function call(path,body){
     return fetcher(ROOT+path,{method:body?'POST':'GET',redirect:'error',signal:AbortSignal.timeout(15000),
       headers:{Authorization:'Bearer '+access,...(body?{'Content-Type':'application/json'}:{})},
@@ -42,7 +48,13 @@ export async function verifyQuoteAtomicProvider({env=process.env,fetcher=fetch,a
     if(updated.totalUpdatedRows!==1||updated.totalUpdatedCells!==2)throw Error('atomic_probe_null_skip_failed');
   }
   try{
-    access=await authorize(env,fetcher);sheetId=randomID();const markerId=randomID(),otherMarkerId=randomID();
+    access=await authorize(env,fetcher);
+    const localeResponse=await call('?fields=properties(locale)');
+    if(localeResponse.ok){
+      const locale=(await localeResponse.json())?.properties?.locale;
+      if(typeof locale==='string'&&/^[a-z]{2}(?:[_-][A-Za-z]{2})?$/.test(locale))diagnostic.locale=locale;
+    }
+    diagnostic.stage='setup';sheetId=randomID();const markerId=randomID(),otherMarkerId=randomID();
     title='TS-Teste-Atomic-'+uuid().slice(0,8);
     if([sheetId,markerId,otherMarkerId].some(id=>!Number.isInteger(id)||id<=0||id>0x7fffffff)
       ||markerId===otherMarkerId||!/^TS-Teste-Atomic-[a-f0-9-]{8}$/.test(title))throw Error('atomic_probe_input_invalid');
@@ -65,8 +77,42 @@ export async function verifyQuoteAtomicProvider({env=process.env,fetcher=fetch,a
     const statuses=responses.map(response=>response.status);
     if(statuses.filter(status=>status===200).length!==1||statuses.filter(status=>status===400).length!==1)
       throw Error('atomic_probe_uniqueness_failed');
+    diagnostic.stage='initial_values';
     const initial=await values();
-    if(initial.length!==2||JSON.stringify(initial[1])!==JSON.stringify(cells.slice(0,17)))throw Error('atomic_probe_values_failed');
+    const actual=initial[1];
+    diagnostic.rowCount=Math.min(initial.length,10);
+    diagnostic.rowLengths=initial.slice(0,10).map(row=>Array.isArray(row)?Math.min(row.length,32):-1);
+    diagnostic.headerMatches=JSON.stringify(initial[0])===JSON.stringify(QUOTE_HEADERS);
+    diagnostic.referenceMatches=actual?.[0]===REF_A;
+    diagnostic.formulaStatus=statusClass(actual?.[14]);
+    diagnostic.trailingEmptyCellIncluded=actual?.length===18&&actual[17]==='';
+    diagnostic.contentMismatchColumns=Array.from({length:17},(_,index)=>index).filter(index=>actual?.[index]!==cells[index]);
+    if(initial.length!==2||JSON.stringify(actual)!==JSON.stringify(cells.slice(0,17))){
+      // Diagnóstico apenas da linha sintética que esta prova acabou de criar.
+      // Nunca devolver valores das células, mensagens de erro da API ou tokens.
+      try{
+        const detail=await call('?ranges='+encodeURIComponent("'"+title+"'!O2")
+          +'&includeGridData=true&fields=sheets(data(rowData(values(userEnteredValue,effectiveValue))))');
+        if(detail.ok){
+          const cell=(await detail.json())?.sheets?.[0]?.data?.[0]?.rowData?.[0]?.values?.[0];
+          diagnostic.originalFormulaMatches=cell?.userEnteredValue?.formulaValue===QUOTE_STATUS_FORMULA;
+          const errorType=cell?.effectiveValue?.errorValue?.type;
+          if(typeof errorType==='string'&&/^[A-Z_]{1,40}$/.test(errorType))diagnostic.originalFormulaErrorType=errorType;
+        }
+        if(diagnostic.formulaStatus!=='Pendente envio'){
+          const alternate='=IF(INDEX(R:R;ROW())="";"Pendente envio";"Novo")';
+          const updated=await call(':batchUpdate',{requests:[{updateCells:{start:{sheetId,rowIndex:1,columnIndex:14},
+            rows:[{values:[{userEnteredValue:{formulaValue:alternate}}]}],fields:'userEnteredValue'}}]});
+          diagnostic.alternativeFormulaAccepted=updated.ok;
+          if(updated.ok){
+            const checked=await call('/values/'+encodeURIComponent("'"+title+"'!A2:R2"));
+            if(checked.ok)diagnostic.alternativeFormulaStatus=statusClass((await checked.json())?.values?.[0]?.[14]);
+          }
+        }
+      }catch{ /* Falhas de diagnóstico não substituem o bloqueio original. */ }
+      throw Error('atomic_probe_values_failed');
+    }
+    diagnostic.stage='row_anchor';
     const other=[...cells];other[0]=REF_B;other[1]='outro texto fictício';
     const second=await call(':batchUpdate',{requests:quoteInsertRequests(sheetId,other,otherMarkerId,REF_B)});
     if(!second.ok)throw Error('atomic_probe_second_row_failed');
@@ -116,12 +162,12 @@ export async function verifyQuoteAtomicProvider({env=process.env,fetcher=fetch,a
       rowAnchorMovesVerified:true,sortAnchorMovesVerified:true,metadataDataFilterVerified:true,
       nullSkipVerified:true,manualStatusPreserved:true,code:'atomic_provider_verified'};
   }catch(error){
-    result={verified:false,code:/^atomic_probe_[a-z_]+$/.test(error?.message||'')?error.message:'atomic_probe_unavailable'};
+    result={verified:false,code:/^atomic_probe_[a-z_]+$/.test(error?.message||'')?error.message:'atomic_probe_unavailable',diagnostic};
   }finally{
     if(created){
       try{const cleanup=await call(':batchUpdate',{requests:[{deleteSheet:{sheetId}}]});removed=cleanup.ok;}
       catch{removed=false;}
-      if(!removed)result={verified:false,code:'atomic_probe_cleanup_pending'};
+      if(!removed)result={...result,verified:false,code:'atomic_probe_cleanup_pending'};
     }
   }
   return {...result,temporarySheetRemoved:removed};
