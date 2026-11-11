@@ -5,6 +5,7 @@ workers_dev = true
 
 [vars]
 RESEND_WEBHOOK_WRITE_ENABLED = "false"
+RESEND_CRM_GENERAL_WRITE_ENABLED = "false"
 
 # Fixture write disabled after verified V26 delivery state.
 [[durable_objects.bindings]]
