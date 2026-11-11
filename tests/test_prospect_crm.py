@@ -403,8 +403,9 @@ class ProspectCrmTests(unittest.TestCase):
         unknown = crm.candidate(sample(osm_id=818, email="geral@mais.pt"), "Braga", "regional")
         unknown[1] = "unknown"
         self.assertEqual(crm.prioritized_candidates([[unknown], [secondary], [primary]], 1), [primary])
-        self.assertEqual(crm.prioritized_candidates([[unknown], [secondary], [primary]], 2), [primary,secondary])
-        self.assertEqual(crm.prioritized_candidates([[unknown], [secondary], [primary]], 3), [primary,secondary,unknown])
+        # Depois da dimensão, a localização prevalece sobre o setor.
+        self.assertEqual(crm.prioritized_candidates([[unknown], [secondary], [primary]], 2), [primary,unknown])
+        self.assertEqual(crm.prioritized_candidates([[unknown], [secondary], [primary]], 3), [primary,unknown,secondary])
 
     def test_brand_is_lower_priority_not_proof_of_large_size(self):
         independent=crm.candidate(sample(osm_id=819), "Porto", "centro")
@@ -414,6 +415,56 @@ class ProspectCrmTests(unittest.TestCase):
         self.assertEqual(crm.size_priority(independent),2)
         self.assertEqual(crm.size_priority(branded),3)
         self.assertGreater(crm.lead_priority_key(branded),crm.lead_priority_key(independent))
+
+
+    def test_city_is_second_priority_before_cae(self):
+        suburb = crm.candidate(sample(osm_id=901), "Maia", "suburbio")
+        suburb[1] = "pet"
+        center = crm.candidate(sample(osm_id=902,email="geral@outra.pt"), "Lisboa", "centro")
+        center[1] = "accountant"
+        self.assertLess(crm.lead_priority_key(suburb), crm.lead_priority_key(center))
+        self.assertEqual(crm.prioritized_candidates([[center], [suburb]], 2), [suburb, center])
+
+    def test_verified_cae_overrides_osm_category_only_with_source(self):
+        row = crm.candidate(sample(osm_id=903), "Maia", "suburbio")
+        row[1] = "pet"
+        self.assertEqual(crm.cae_priority(row), 1)
+        row[16] += "; CAE_VERIFICADO=69200"
+        self.assertIsNone(crm.verified_cae(row))
+        self.assertEqual(crm.cae_priority(row), 1)
+        row[16] += "; FONTE_CAE=https://diretorio.pt/empresa"
+        self.assertEqual(crm.verified_cae(row), "69200")
+        self.assertEqual(crm.cae_priority(row), 0)
+
+    def test_verified_out_of_scope_cae_is_excluded_from_discovery(self):
+        outside = crm.candidate(sample(osm_id=904), "Maia", "suburbio")
+        outside[16] += "; CAE_VERIFICADO=84111; FONTE_CAE=https://registo.pt/empresa"
+        normal = crm.candidate(sample(osm_id=905,email="info@nova.pt"), "Maia", "suburbio")
+        self.assertFalse(crm.in_target_segment(outside))
+        self.assertEqual(crm.lead_priority_key(outside), (99,99,99,99))
+        self.assertEqual(crm.prepare_rows_for_write([], [outside,normal], 15), [normal])
+        self.assertTrue(crm.in_target_segment(normal))
+
+    def test_small_company_precedes_any_urban_or_sector_advantage(self):
+        verified = crm.candidate(sample(osm_id=906), "Lisboa", "centro")
+        verified[1] = "pet"
+        verified[16] += "; DIMENSAO_VERIFICADA=8; FONTE_DIMENSAO=https://registo.pt"
+        unknown = crm.candidate(sample(osm_id=907,email="geral@outra.pt"), "Maia", "suburbio")
+        unknown[1] = "accountant"
+        unknown[16] += "; CAE_VERIFICADO=69200; FONTE_CAE=https://registo.pt"
+        self.assertLess(crm.lead_priority_key(verified), crm.lead_priority_key(unknown))
+
+    def test_search_broadens_office_shop_craft_before_ranking(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        response = SimpleNamespace(status_code=200,json=lambda:{"elements":[]})
+        with patch.object(crm.requests, "get",return_value=response) as get, \
+             patch.object(crm.time,"sleep",return_value=None):
+            self.assertEqual(crm.find_candidates([],10,day="2026-11-12"),[])
+        query=get.call_args_list[0].kwargs["params"]["data"]
+        for expected in ['["office"]["name"]','["shop"]["name"]','["craft"]["name"]']:
+            self.assertIn(expected,query)
+        self.assertNotIn("accountant|estate_agent",query)
 
 
 if __name__ == "__main__":
