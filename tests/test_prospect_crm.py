@@ -25,6 +25,16 @@ class ProspectCrmTests(unittest.TestCase):
         self.assertEqual(row[17:23], [""] * 6)
         self.assertEqual(row[25], "osm:node:123")
 
+    def test_service_company_candidate_is_blocked(self):
+        business = sample(name="Gabinete Exemplo", email="geral@exemplo.pt", osm_id=987)
+        business["tags"].pop("shop")
+        business["tags"]["office"] = "accountant"
+        row = crm.candidate(business, "Porto")
+        self.assertEqual(row[1], "accountant")
+        self.assertEqual(row[24], "Sim")
+        self.assertEqual(row[23], "Por avaliar")
+        self.assertEqual(row[17:23], [""] * 6)
+
     def test_reject_personal_email(self):
         self.assertIsNone(crm.candidate(sample(email="joana@alfa.pt"), "Porto"))
 
