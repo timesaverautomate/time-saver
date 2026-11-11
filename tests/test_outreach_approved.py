@@ -194,5 +194,30 @@ class SafeOutreachTests(unittest.TestCase):
         self.assertIsNone(delivery.delivery_status("sent","Spam"))
 
 
+    def test_send_selects_small_before_suburb_and_cae(self):
+        # Todos os destinatários abaixo têm consentimento documentado de teste.
+        unknown = company(osm_id=110, email="geral@outra.pt", site="https://outra.pt")
+        unknown[2] = "Área de Maia (aproximada)"
+        unknown[16] += "; TIPO_ZONA=suburbio"
+        unknown[1] = "accountant"
+        micro = company(osm_id=111,email="geral@micro.pt",site="https://micro.pt")
+        micro[2] = "Lisboa"
+        micro[16] = micro[16].replace("TIPO_ZONA=suburbio", "TIPO_ZONA=centro")
+        micro[1] = "pet"
+        micro[16] += "; DIMENSAO_VERIFICADA=7; FONTE_DIMENSAO=https://registos.pt/micro"
+        selected, _ = delivery.select_approved(
+            [unknown, micro], [approved(unknown,2),approved(micro,3)],
+            today=date(2026,11,11))
+        self.assertEqual([line for line,_,_ in selected],[3,2])
+
+    def test_verified_excluded_cae_blocks_even_optin(self):
+        row = company(osm_id=112)
+        row[16] += "; CAE_VERIFICADO=84111; FONTE_CAE=https://registos.pt/empresa"
+        selected,reasons=delivery.select_approved(
+            [row],[approved(row)],today=date(2026,11,11))
+        self.assertEqual(selected,[])
+        self.assertEqual(reasons["Fora dos limites de dimensão ou CAE documentados"],1)
+
+
 if __name__=="__main__":
     unittest.main()
