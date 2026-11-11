@@ -112,6 +112,21 @@ class ProspectCrmTests(unittest.TestCase):
         self.assertEqual(preview["status"], "SIMULADO — NÃO ENVIADO")
         self.assertEqual(row[24], "Sim")
 
+    def test_global_suppression_and_deduplication(self):
+        blocked = crm.candidate(sample(), "Porto")
+        allowed = list(blocked)
+        allowed[24] = "Não"
+        allowed[21] = ""
+        self.assertIn("geral@alfa.pt", crm.suppression_index([blocked, allowed]))
+        blocked[24] = "Não"
+        blocked[21] = "Cancelou subscrição"
+        self.assertIn("geral@alfa.pt", crm.suppression_index([blocked]))
+        blocked[21] = ""
+        self.assertEqual(crm.suppression_index([blocked]), set())
+        unique = crm.unique_send_candidates([(2, blocked), (8, allowed)])
+        self.assertEqual(len(unique), 1)
+        self.assertEqual(unique[0][0], 8)
+
     def test_send_gate_fails_closed(self):
         row = crm.candidate(sample(), "Porto")
         review = crm.review_row(row, 2)
