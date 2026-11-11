@@ -296,8 +296,9 @@ class ProspectCrmTests(unittest.TestCase):
         self.assertGreater(crm.prospect_score(suburb), crm.prospect_score(metro))
         self.assertNotIn("DIMENSAO_VERIFICADA", suburb[16])
         with_evidence = list(suburb)
-        with_evidence[16] += "; DIMENSAO_VERIFICADA=9"
-        self.assertEqual(crm.prospect_score(with_evidence) - crm.prospect_score(suburb), 15)
+        with_evidence[16] += "; DIMENSAO_VERIFICADA=9; FONTE_DIMENSAO=https://fonte-exemplo.pt/equipa"
+        self.assertGreater(crm.prospect_score(with_evidence), crm.prospect_score(suburb))
+        self.assertEqual(crm.size_priority(with_evidence), 0)
         branded = sample(osm_id=402)
         branded["tags"]["brand"] = "Franquia hipotética"
         chain = crm.candidate(branded, "Maia", "suburbio")
@@ -355,6 +356,64 @@ class ProspectCrmTests(unittest.TestCase):
         self.assertNotIn("around:", query)
         self.assertIn("nwr(", query)
         self.assertEqual(rows[0][24], "Sim")
+
+
+    def test_size_is_first_even_when_sector_or_city_is_better(self):
+        # Pequena empresa fora do setor prioritário ultrapassa setor prioritário
+        # sem prova da dimensão. Centro urbano não supera subúrbio por si só.
+        small = crm.candidate(sample(osm_id=810), "Lisboa", "centro")
+        small[1] = "pet"
+        small[16] += "; DIMENSAO_VERIFICADA=15; FONTE_DIMENSAO=https://fonte.pt/equipa"
+        unknown = crm.candidate(sample(osm_id=811), "Maia", "suburbio")
+        unknown[1] = "accountant"
+        self.assertEqual(crm.size_priority(small), 1)
+        self.assertEqual(crm.size_priority(unknown), 2)
+        self.assertLess(crm.lead_priority_key(small), crm.lead_priority_key(unknown))
+        self.assertEqual(crm.prioritized_candidates([[unknown], [small]], 2)[0], small)
+
+    def test_micro_precedes_small_independent_of_sector(self):
+        micro = crm.candidate(sample(osm_id=812), "Porto", "centro")
+        micro[1] = "pet"
+        micro[16] += "; DIMENSAO_VERIFICADA=4; FONTE_DIMENSAO=https://fonte.pt/relatorio"
+        small = crm.candidate(sample(osm_id=813, email="geral@outra.pt"), "Maia", "suburbio")
+        small[1] = "accountant"
+        small[16] += "; DIMENSAO_VERIFICADA=22; FONTE_DIMENSAO=https://fonte.pt/relatorio"
+        self.assertLess(crm.lead_priority_key(micro), crm.lead_priority_key(small))
+        self.assertEqual(crm.prioritized_candidates([[small], [micro]], 2)[0], micro)
+
+    def test_verified_large_is_excluded_but_unknown_not_assumed_large(self):
+        large = crm.candidate(sample(osm_id=814), "Porto", "centro")
+        large[16] += "; DIMENSAO_VERIFICADA=50; FONTE_DIMENSAO=https://fonte.pt/relatorio"
+        self.assertIsNone(crm.size_priority(large))
+        no_source = list(large)
+        no_source[16] = no_source[16].split("FONTE_DIMENSAO")[0]
+        self.assertEqual(crm.size_priority(no_source), 2)
+        small = crm.candidate(sample(osm_id=815, email="geral@nova.pt"), "Porto", "centro")
+        kept = crm.prepare_rows_for_write([], [large, small], 15)
+        self.assertEqual(len(kept), 1)
+        self.assertEqual(kept[0][0], small[0])
+
+    def test_fallback_sector_only_after_small_size_priority(self):
+        # O setor secundário entra quando faltam candidatos nos setores principais,
+        # sem inverter a ordem por dimensão.
+        primary = crm.candidate(sample(osm_id=816), "Maia", "suburbio")
+        primary[1] = "accountant"
+        secondary = crm.candidate(sample(osm_id=817, email="geral@outra.pt"), "Porto", "centro")
+        secondary[1] = "architect"
+        unknown = crm.candidate(sample(osm_id=818, email="geral@mais.pt"), "Braga", "regional")
+        unknown[1] = "unknown"
+        self.assertEqual(crm.prioritized_candidates([[unknown], [secondary], [primary]], 1), [primary])
+        self.assertEqual(crm.prioritized_candidates([[unknown], [secondary], [primary]], 2), [primary,secondary])
+        self.assertEqual(crm.prioritized_candidates([[unknown], [secondary], [primary]], 3), [primary,secondary,unknown])
+
+    def test_brand_is_lower_priority_not_proof_of_large_size(self):
+        independent=crm.candidate(sample(osm_id=819), "Porto", "centro")
+        branded_element=sample(osm_id=820,email="geral@marca.pt")
+        branded_element["tags"]["brand"]="Exemplo"
+        branded=crm.candidate(branded_element, "Maia", "suburbio")
+        self.assertEqual(crm.size_priority(independent),2)
+        self.assertEqual(crm.size_priority(branded),3)
+        self.assertGreater(crm.lead_priority_key(branded),crm.lead_priority_key(independent))
 
 
 if __name__ == "__main__":
