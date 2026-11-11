@@ -45,7 +45,7 @@ class ProspectCrmTests(unittest.TestCase):
 
     def test_review_row_is_never_preapproved(self):
         row = crm.review_row(crm.candidate(sample(), "Porto"), 25)
-        self.assertEqual(len(row), 12)
+        self.assertEqual(len(row), 19)
         self.assertEqual(row[8], "Por verificar")
         self.assertEqual(row[9], "")
         self.assertIn("RASCUNHO NÃO ENVIADO", row[10])
@@ -92,12 +92,11 @@ class ProspectCrmTests(unittest.TestCase):
         row = crm.candidate(sample(), "Porto")
         subject, body = crm.proposal_content(row)
         self.assertEqual(subject, "TimeSaver | Poupe tempo e reduza custos com automação")
-        self.assertIn("tratamento automático de faturas", body)
-        self.assertIn("gestão de emails", body)
-        self.assertIn("ficheiros Excel", body)
-        self.assertIn("Entre outros processos administrativos", body)
-        self.assertIn("breve reunião, sem compromisso", body)
-        self.assertIn("solicitar diretamente um orçamento", body)
+        self.assertIn("reconciliações", body)
+        self.assertIn("mapas Excel", body)
+        self.assertIn("pequenas empresas", body)
+        self.assertIn("breve conversa, sem compromisso", body)
+        self.assertIn("Não contactar", body)
         self.assertIn("https://timesaverautomate.com", body)
         self.assertIn("RASCUNHO NÃO ENVIADO", crm.draft_proposal(row))
         self.assertEqual(row[24], "Sim")
@@ -137,6 +136,11 @@ class ProspectCrmTests(unittest.TestCase):
         row[24] = "Não"
         review[8] = "Verificado"
         review[9] = "Consentimento documentado"
+        row[23] = "Consentimento documentado"
+        review[14] = crm.today_lisbon()
+        review[15] = "https://alfa.pt"
+        review[16] = "Aprovado"
+        review[18] = crm.today_lisbon()
         self.assertTrue(crm.evaluate_send_eligibility(row, review)[0])
         self.assertFalse(crm.evaluate_send_eligibility(row, review, {"geral@alfa.pt"})[0])
         review[9] = "Por avaliar"
