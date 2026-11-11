@@ -43,6 +43,35 @@ class ProspectCrmTests(unittest.TestCase):
         self.assertIn("REVER:", row[16])
         self.assertEqual(row[24], "Sim")
 
+    def test_review_row_is_never_preapproved(self):
+        row = crm.review_row(crm.candidate(sample(), "Porto"), 25)
+        self.assertEqual(len(row), 12)
+        self.assertEqual(row[8], "Por verificar")
+        self.assertEqual(row[9:11], ["", ""])
+        self.assertEqual(row[11], "25")
+
+    def test_review_sync_preserves_existing_decisions(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        first = crm.candidate(sample(name="Já revista", email="geral@alfa.pt", osm_id=100), "Porto")
+        second = crm.candidate(sample(name="Nova empresa", email="info@nova.pt", osm_id=101), "Braga")
+        existing = crm.review_row(first, 2)
+        existing[8] = "Verificado"
+        existing[10] = "Decisão humana preservada"
+        writes = []
+        def fake_get(*args, **kwargs):
+            return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"values": [crm.REVIEW_HEADERS, existing]})
+        def fake_post(*args, **kwargs):
+            writes.extend(kwargs["json"]["values"])
+            return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"updates": {"updatedRows": 1}})
+        with patch.object(crm.requests, "get", side_effect=fake_get), patch.object(crm.requests, "post", side_effect=fake_post):
+            result = crm.sync_review(SimpleNamespace(token="fake"), [first, second])
+        self.assertEqual(result, 1)
+        self.assertEqual(writes[0][0], "Nova empresa")
+        self.assertEqual(writes[0][8], "Por verificar")
+        self.assertEqual(existing[8], "Verificado")
+        self.assertEqual(existing[10], "Decisão humana preservada")
+
     def test_reject_personal_email(self):
         self.assertIsNone(crm.candidate(sample(email="joana@alfa.pt"), "Porto"))
 
