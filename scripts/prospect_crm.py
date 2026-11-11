@@ -103,9 +103,10 @@ def search_plan(day=None):
 
 
 ENDPOINTS = (
+    # Private.coffee autoriza uso comercial (termos de 10/04/2026).
     "https://overpass.private.coffee/api/interpreter",
+    # Reserva apenas para o piloto e com uso moderado.
     "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
 )
 HEADERS = [
     "Empresa", "Setor", "Localidade", "Website", "Email comercial", "Telefone",
@@ -675,7 +676,7 @@ def find_candidates(existing, limit, day=None):
                 response = requests.post(
                     endpoint, data={"data": query},
                     headers={"User-Agent": "TimeSaverAutomation/1.2 (small business research; timesaverautomate.com)"},
-                    timeout=(10, 45),
+                    timeout=(5, 20),
                 )
                 if response.status_code != 200:
                     print(f"Fonte {endpoint}; zona {city}; HTTP {response.status_code}", flush=True)
