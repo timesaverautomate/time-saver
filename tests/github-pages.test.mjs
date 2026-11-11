@@ -83,7 +83,7 @@ test('modo de contacto inclui triagem e informação real, mantendo o envio desl
     const home=await readFile(path.join(directory,'index.html'),'utf8');
     assert.match(home,/time-saver-form-definition" content="direct-email-v1/);
     assert.match(home,/time-saver-form-mode" content="disabled/);
-    assert.equal((home.match(/type="radio" name="service"/g)||[]).length,7);
+    assert.equal((home.match(/type="checkbox" name="service"/g)||[]).length,7);
     assert.match(home,/id="goal"/);assert.match(home,/id="frequency"/);assert.match(home,/id="startingPoint"/);
     assert.doesNotMatch(home,/pré-lançamento|identificação legal por completar/i);
     const privacy=await readFile(path.join(directory,'privacidade/index.html'),'utf8');
