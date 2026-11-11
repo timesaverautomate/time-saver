@@ -1,5 +1,7 @@
 # Correções e verificação de segurança — 11/11/2026
 
+> Registo histórico desta verificação. A [auditoria posterior do mesmo dia](AUDITORIA-SEGURANCA-2026-11-11.md) documenta a correção adicional da escrita após ordenação, o novo ciclo de vida dos marcadores associados à linha e a verificação do webhook auxiliar. As descrições abaixo referem-se à versão então testada.
+
 As duas pendências identificadas na reposição visual foram tratadas e verificadas em produção. O HTML PT/EN, CSS, JavaScript do navegador e aspeto do sítio mantiveram os mesmos hashes.
 
 Código: [2cf9b41](https://github.com/timesaverautomate/time-saver/commit/2cf9b41d7a7b23f56ba9292fdc5b0f4a9c4e3fa5). [Execução de produção](https://github.com/timesaverautomate/time-saver/actions/runs/43001015996).
