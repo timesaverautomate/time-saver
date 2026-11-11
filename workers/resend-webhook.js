@@ -155,8 +155,8 @@ export function planCrmEvent(rows,event) {
   const number=matches[0], row=rows[number-1],current=String(row[21]??"").trim(),next=states[event.type];
   const blocked=new Set(["Bounce","Spam","Cancelou subscrição"]);
   // Terminal delivery states cannot be reverted by late or replayed events.
-  if(blocked.has(current)&&!blocked.has(next)) return {matched:true,planned_cells:0,updates:[]};
-  if(current==="Entregue"&&["Enviado","Entrega atrasada"].includes(next)) return {matched:true,planned_cells:0,updates:[]};
+  if(blocked.has(current)) return {matched:true,planned_cells:0,updates:[]};
+  if(current==="Entregue"&&["Enviado","Entrega atrasada","Erro"].includes(next)) return {matched:true,planned_cells:0,updates:[]};
   const updates=[];
   if(current!==next) updates.push({range:"'Pedidos'!V"+number,values:[[next]]});
   if(blocked.has(next)&&String(row[24]??"").trim().toLowerCase()!=="sim")
@@ -249,7 +249,8 @@ export class CrmEventCoordinator {
         const safe=new Set(["invalid_credentials","google_auth_failed","google_sheet_read_failed","crm_schema_mismatch","duplicate_message_id","google_sheet_write_failed","google_sheet_write_incomplete"]);
         const reason=safe.has(error?.message)?error.message:"crm_check_failed";
         console.warn("resend_crm_coordinator_check_failed",reason);
-        return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:reason});
+        return response({accepted:false,mode:"error",crm_writes_enabled:false,crm_check:reason},
+          ["google_auth_failed","google_sheet_read_failed","google_sheet_write_failed","google_sheet_write_incomplete","crm_check_failed"].includes(reason)?503:200);
       }
     });
     this.pending=task.then(()=>{},()=>{});
