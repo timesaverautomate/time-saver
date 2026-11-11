@@ -5,3 +5,12 @@ workers_dev = true
 
 [vars]
 RESEND_WEBHOOK_WRITE_ENABLED = "false"
+
+# First deployment provisions the coordinator without enabling CRM writes.
+[[durable_objects.bindings]]
+name = "CRM_COORDINATOR"
+class_name = "CrmEventCoordinator"
+
+[[migrations]]
+tag = "crm-coordinator-v1"
+new_sqlite_classes = ["CrmEventCoordinator"]
