@@ -4,9 +4,9 @@ compatibility_date = "2026-11-01"
 workers_dev = true
 
 [vars]
-RESEND_WEBHOOK_WRITE_ENABLED = "false"
+RESEND_WEBHOOK_WRITE_ENABLED = "true"
 
-# First deployment provisions the coordinator without enabling CRM writes.
+# Temporary one-message CRM fixture write only; remove after verification.
 [[durable_objects.bindings]]
 name = "CRM_COORDINATOR"
 class_name = "CrmEventCoordinator"
