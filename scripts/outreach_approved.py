@@ -254,6 +254,22 @@ def send_approved(credentials, api_key, sender, *, today=None, http=requests):
             text_cell(confirm[line-2], 21) != marker or
             text_cell(confirm[line-2], 25) != text_cell(row, 25)):
             raise RuntimeError(f"Linha {line}: reserva não confirmada; intervenção necessária")
+        # Última revalidação antes da chamada externa. Não há compare-and-swap
+        # entre duas edições manuais do Sheets: em dúvida, manter a reserva.
+        current_reviews = index_reviews(read_review(credentials, http))
+        latest_review = current_reviews.get(str(line))
+        check_row = list(confirm[line-2])
+        check_row[21] = ""  # Estado técnico reservado, sem desbloquear Y.
+        allowed, _ = crm.evaluate_send_eligibility(
+            check_row, latest_review or [],
+            crm.suppression_index(confirm),
+            today=crm.date.fromisoformat(day)
+        )
+        if (not latest_review or
+            text_cell(latest_review, 11) != str(line) or
+            text_cell(latest_review, 9) != "Consentimento documentado" or
+            not allowed):
+            raise RuntimeError(f"Linha {line}: autorização alterada após reserva; sem envio")
         # Não repetir automaticamente em caso de timeout. A reserva mantém-se.
         response = http.post("https://api.resend.com/emails",
             headers={"Authorization": "Bearer " + api_key,
