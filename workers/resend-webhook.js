@@ -229,7 +229,7 @@ export class CrmEventCoordinator {
         const fixture=event.type==="email.delivered" &&
           event.data.email_id==="01a1ca94-4663-7eee-93bc-6fd01eccf4f4" &&
           plan.matched && plan.updates.length===1 &&
-          plan.updates[0].range==="'Pedidos'!V25" &&
+          plan.updates[0].range==="'Pedidos'!V26" &&
           plan.updates[0].values?.[0]?.[0]==="Entregue";
         if(this.env.RESEND_WEBHOOK_WRITE_ENABLED==="true" && fixture) {
           const result=await writePlannedCrmCells(this.env.GOOGLE_SERVICE_ACCOUNT_JSON,plan.updates);
