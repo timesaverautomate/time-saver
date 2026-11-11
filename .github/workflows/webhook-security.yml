@@ -1,4 +1,4 @@
-name: Publicar proteções do webhook Resend
+name: Verificar proteções do webhook Resend
 on:
   workflow_dispatch:
   push:
@@ -8,6 +8,8 @@ on:
       - 'tests/secret-audit.test.mjs'
       - 'workers/resend-webhook.js'
       - 'scripts/deploy-resend-webhook.mjs'
+      - 'scripts/verify-resend-webhook-readonly.mjs'
+      - 'tests/webhook-readonly.test.mjs'
       - '.github/workflows/webhook-security.yml'
 permissions: {}
 concurrency:
@@ -32,8 +34,8 @@ jobs:
         run: npm run check
       - name: Auditar padrões de segredos no histórico sem os publicar
         run: python scripts/audit-repository-secrets.py
-      - name: Atualizar apenas o webhook existente e verificar acesso público
+      - name: Verificar código instalado e acesso público sem alterar a Cloudflare
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITE_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: node scripts/deploy-resend-webhook.mjs
+        run: node scripts/verify-resend-webhook-readonly.mjs
