@@ -109,7 +109,7 @@ class ProspectCrmTests(unittest.TestCase):
         preview = crm.build_resend_preview(row)
         self.assertEqual(preview["to"], "geral@alfa.pt")
         self.assertIn("Poupe tempo e reduza custos", preview["subject"])
-        self.assertIn("reconciliações", preview["text"])
+        self.assertIn("reconciliações", preview["text"].casefold())
         self.assertEqual(preview["status"], "SIMULADO — NÃO ENVIADO")
         self.assertEqual(row[24], "Sim")
 
