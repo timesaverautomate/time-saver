@@ -218,6 +218,69 @@ def read_rows(credentials):
     return rows[1:]
 
 
+
+REVIEW_HEADERS = [
+    "Empresa", "Setor", "Localidade", "Website", "Email comercial",
+    "Prioridade", "Fonte pública", "Triagem automática", "Estado de revisão",
+    "Base legal / autorização", "Observações da revisão", "Linha CRM",
+]
+
+
+def review_row(crm_row, line_number):
+    def cell(index):
+        return str(crm_row[index]) if len(crm_row) > index else ""
+    return [
+        cell(0), cell(1), cell(2), cell(3), cell(4), cell(8), cell(15),
+        ("Sem email confirmado" if not cell(4) else
+         "Sem website identificado" if not domain(cell(3)) else
+         "Domínio coincide (não verificado)" if cell(4).rsplit("@", 1)[-1].lower() == domain(cell(3))
+         else "Domínios diferentes (rever)"),
+        "Por verificar", "", "", str(line_number),
+    ]
+
+
+def sync_review(credentials, crm_rows):
+    """Só acrescenta linhas em falta; nunca altera estados/decisões existentes."""
+    target = quote("'Revisão Comercial'!A1:L10000", safe="")
+    response = requests.get(
+        f"{API}/values/{target}",
+        headers={"Authorization": "Bearer " + credentials.token},
+        timeout=30,
+    )
+    response.raise_for_status()
+    values = response.json().get("values", [])
+    if not values or values[0] != REVIEW_HEADERS:
+        raise RuntimeError("Cabeçalhos da Revisão Comercial alterados; sincronização recusada.")
+    existing_lines = {str(r[11]).strip() for r in values[1:] if len(r) > 11 and str(r[11]).strip()}
+    existing_names = {(norm(r[0]), norm(r[2])) for r in values[1:] if len(r) > 2 and r[0] and r[2]}
+    additions = []
+    for line, crm_row in enumerate(crm_rows, start=2):
+        if not crm_row or not crm_row[0]:
+            continue
+        key = (norm(crm_row[0]), norm(crm_row[2] if len(crm_row) > 2 else ""))
+        if str(line) in existing_lines or key in existing_names:
+            continue
+        additions.append(review_row(crm_row, line))
+        existing_lines.add(str(line))
+        existing_names.add(key)
+    if not additions:
+        print("Revisão Comercial sincronizada: zero novas linhas.")
+        return 0
+    result = requests.post(
+        f"{API}/values/{quote(chr(39) + 'Revisão Comercial' + chr(39) + '!A:L', safe='')}:append",
+        params={"valueInputOption": "RAW", "insertDataOption": "INSERT_ROWS"},
+        headers={"Authorization": "Bearer " + credentials.token},
+        json={"values": additions},
+        timeout=30,
+    )
+    result.raise_for_status()
+    if result.json().get("updates", {}).get("updatedRows") != len(additions):
+        raise RuntimeError("Sincronização sem confirmação de escrita; verificar manualmente.")
+    print(f"Revisão Comercial: {len(additions)} novas linhas; decisões anteriores preservadas.")
+    return len(additions)
+
+
+
 def find_candidates(existing, limit):
     seen = existing_keys(existing)
     candidates = []
@@ -362,6 +425,8 @@ def main():
     existing = read_rows(credentials)
     day = today_lisbon()
     print(f"CRM consultado: {len(existing)} empresas. Modo: {mode}.", flush=True)
+    if mode in ("diario", "teste_escrita_2"):
+        sync_review(credentials, existing)
     if mode == "diario":
         remaining = daily_remaining(existing, day)
         print(f"Quota automática {day}: {MAX_DAILY_WRITES - remaining}/{MAX_DAILY_WRITES} usadas.")
@@ -371,10 +436,12 @@ def main():
             return
         candidates = find_candidates(existing, remaining)
         written = write_candidates(credentials, candidates, remaining, mode, day=day)
+        sync_review(credentials, read_rows(credentials))
         publish_summary(mode, len(existing), len(candidates), written)
     elif mode == "teste_escrita_2":
         candidates = find_candidates(existing, MAX_TEST_WRITES)
         written = write_candidates(credentials, candidates, MAX_TEST_WRITES, mode)
+        sync_review(credentials, read_rows(credentials))
         publish_summary(mode, len(existing), len(candidates), written)
     else:
         candidates = find_candidates(existing, MAX_DAILY_WRITES)
