@@ -31,6 +31,83 @@ document.addEventListener('click',event=>{
 const currentYear = document.querySelector('#current-year');
 if (currentYear) currentYear.textContent = String(new Date().getFullYear());
 
+// A agenda externa só é carregada após um pedido explícito do visitante.
+const bookingDialog = document.querySelector('#booking-dialog');
+const bookingFrame = document.querySelector('#booking-frame');
+const bookingStatus = document.querySelector('#booking-status');
+const bookingFallback = document.querySelector('#booking-fallback');
+if (bookingDialog && bookingFrame && bookingStatus && bookingFallback
+    && typeof bookingDialog.showModal === 'function') {
+  let bookingTrigger = null;
+  let bookingLoadingTimer;
+  bookingDialog.querySelector('[data-booking-close]')?.addEventListener('click',()=>bookingDialog.close());
+  bookingDialog.addEventListener('click',event=>{
+    if(event.target!==bookingDialog)return;
+    const bounds=bookingDialog.getBoundingClientRect();
+    if(event.clientX<bounds.left || event.clientX>bounds.right
+        || event.clientY<bounds.top || event.clientY>bounds.bottom)bookingDialog.close();
+  });
+  bookingDialog.addEventListener('close',()=>{
+    clearTimeout(bookingLoadingTimer);
+    bookingFrame.replaceChildren();
+    bookingFrame.classList.remove('is-loading');
+    bookingFrame.removeAttribute('aria-busy');
+    bookingStatus.textContent='';
+    document.documentElement.classList.remove('booking-open');
+    if(bookingTrigger?.isConnected)bookingTrigger.focus({preventScroll:true});
+    bookingTrigger=null;
+  });
+  document.querySelectorAll('a[data-contact="calendar"]').forEach(link=>{
+    link.addEventListener('click',event=>{
+      if(event.defaultPrevented || event.button!==0 || event.ctrlKey || event.metaKey
+          || event.shiftKey || event.altKey || bookingDialog.open)return;
+      let calendar;
+      try {
+        calendar=new URL(link.href);
+        if(calendar.origin!=='https://calendly.com'
+            || calendar.pathname!=='/timesaverautomate/30min'
+            || calendar.username || calendar.password || calendar.search || calendar.hash)return;
+        // Sem JavaScript ou sem diálogo nativo, a ligação original continua a funcionar.
+        bookingDialog.showModal();
+      } catch {return;}
+      event.preventDefault();
+      bookingTrigger=link;
+      document.documentElement.classList.add('booking-open');
+      bookingFallback.href=calendar.href;
+      calendar.search=new URLSearchParams({
+        embed_domain:location.hostname,
+        embed_type:'Inline',
+        hide_event_type_details:'1',
+        background_color:'f8fcfa',
+        text_color:'18332f',
+        primary_color:'146451'
+      }).toString();
+      const iframe=document.createElement('iframe');
+      iframe.title=translate('Calendário para marcar uma conversa com a Time Saver','Calendar for booking a call with Time Saver');
+      iframe.referrerPolicy='no-referrer';
+      iframe.setAttribute('sandbox','allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox');
+      iframe.setAttribute('allow',"camera 'none'; microphone 'none'; geolocation 'none'");
+      bookingStatus.textContent=translate('A carregar os horários disponíveis…','Loading available times…');
+      bookingFrame.classList.add('is-loading');
+      bookingFrame.setAttribute('aria-busy','true');
+      iframe.addEventListener('load',()=>{
+        if(!bookingDialog.open || !iframe.isConnected)return;
+        clearTimeout(bookingLoadingTimer);
+        bookingFrame.classList.remove('is-loading');
+        bookingFrame.removeAttribute('aria-busy');
+        bookingStatus.textContent=translate('Escolha o dia e o horário na agenda.','Choose a date and time in the calendar.');
+      },{once:true});
+      iframe.src=calendar.href;
+      bookingFrame.replaceChildren(iframe);
+      bookingLoadingTimer=setTimeout(()=>{
+        if(bookingDialog.open)bookingStatus.textContent=translate(
+          'Se o calendário não aparecer, utilize a ligação abaixo para abrir a agenda.',
+          'If the calendar does not appear, use the link below to open it.');
+      },12000);
+    });
+  });
+}
+
 const flows = {
   relatorios:[
     translate('Vários ficheiros Excel','Several Excel files'),

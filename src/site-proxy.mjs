@@ -7,7 +7,7 @@ const ROUTES=new Set(['','index.html','styles.css','app.js','logo.svg','favicon.
   'partilha.png','partilha.svg','404.html','robots.txt','sitemap.xml','privacidade/','aviso-legal/','cookies/',
   'en/','en/privacy/','en/legal/','en/cookies/']);
 const PAGE_PATHS=['/privacidade','/aviso-legal','/cookies','/en','/en/privacy','/en/legal','/en/cookies'];
-const POLICY="default-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'none'; img-src 'self'; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; worker-src 'none'; require-trusted-types-for 'script'; trusted-types 'none'; upgrade-insecure-requests";
+const POLICY="default-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'none'; img-src 'self'; font-src 'self'; frame-src https://calendly.com; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; worker-src 'none'; require-trusted-types-for 'script'; trusted-types 'none'; upgrade-insecure-requests";
 
 function protectedHeaders(env, upstream, indexable=env.SEARCH_INDEXING_ENABLED==='true') {
   const headers=new Headers(upstream || {});

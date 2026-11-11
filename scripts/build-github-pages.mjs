@@ -36,7 +36,7 @@ function rewriteRootLinks(html,basePath){
     return attribute+'="'+basePath+(routeAliases.get(resource)??resource)+suffix+'"';
   });
 }
-const csp = "default-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'none'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; worker-src 'none'; require-trusted-types-for 'script'; trusted-types 'none'; upgrade-insecure-requests";
+const csp = "default-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'none'; img-src 'self'; font-src 'self'; frame-src https://calendly.com; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; worker-src 'none'; require-trusted-types-for 'script'; trusted-types 'none'; upgrade-insecure-requests";
 
 export async function buildGitHubPages({
   sourceDirectory = path.join(root,'public'),
