@@ -226,6 +226,46 @@ REVIEW_HEADERS = [
 ]
 
 
+
+def prospect_score(row):
+    """Pontuação comercial; não representa elegibilidade legal."""
+    sector = norm(row[1] if len(row) > 1 else "")
+    opportunity = norm(row[7] if len(row) > 7 else "")
+    website = str(row[3]) if len(row) > 3 else ""
+    email = str(row[4]).lower() if len(row) > 4 else ""
+    priority = norm(row[8] if len(row) > 8 else "")
+    score = 0
+    if any(word in sector for word in ("contab", "accountant", "consult", "insurance", "estate_agent", "imobili")):
+        score += 3
+    if any(word in opportunity for word in ("excel", "reconcil", "relatori", "document", "fatur", "process")):
+        score += 2
+    if priority == "alta":
+        score += 2
+    if domain(website) and email.rsplit("@", 1)[-1] == domain(website):
+        score += 2
+    if not email:
+        score -= 4
+    return max(0, score)
+
+
+def draft_proposal(row):
+    """Rascunho interno; não envia mensagens."""
+    sector = norm(row[1] if len(row) > 1 else "")
+    if "contab" in sector or "accountant" in sector:
+        benefit = "automatizar reconciliações, tratamento de documentos e relatórios"
+    elif "estate_agent" in sector or "imobili" in sector:
+        benefit = "automatizar acompanhamento de contactos, tarefas e documentação"
+    else:
+        benefit = "reduzir tarefas repetitivas e integrar processos administrativos"
+    return (
+        f"RASCUNHO NÃO ENVIADO — Bom dia, equipa {str(row[0])[:80]}. "
+        f"Na TimeSaver ajudamos empresas a {benefit}, poupando tempo operacional. "
+        "Faria sentido conversarmos brevemente para identificar oportunidades concretas? "
+        "Cumprimentos, Equipa TimeSaver."
+    )
+
+
+
 def review_row(crm_row, line_number):
     def cell(index):
         return str(crm_row[index]) if len(crm_row) > index else ""
@@ -235,7 +275,7 @@ def review_row(crm_row, line_number):
          "Sem website identificado" if not domain(cell(3)) else
          "Domínio coincide (não verificado)" if cell(4).rsplit("@", 1)[-1].lower() == domain(cell(3))
          else "Domínios diferentes (rever)"),
-        "Por verificar", "", "", str(line_number),
+        "Por verificar", "", f"Score comercial: {prospect_score(crm_row)}/9; " + draft_proposal(crm_row), str(line_number),
     ]
 
 
@@ -412,7 +452,7 @@ def publish_summary(mode, before, found, written, status="Concluído"):
         f"- Candidatos novos encontrados: {found}",
         f"- Registos adicionados ao CRM: {written}",
         "- Emails enviados: **0**",
-        "- Contactos novos: **bloqueados até verificação manual**",
+        "- Contactos novos: **bloqueados até comprovação de elegibilidade legal**",
     ]
     with open(path, "a", encoding="utf-8") as handle:
         handle.write("\n".join(lines) + "\n")
