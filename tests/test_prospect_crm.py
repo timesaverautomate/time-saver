@@ -97,6 +97,8 @@ class ProspectCrmTests(unittest.TestCase):
         self.assertIn("ficheiros Excel", body)
         self.assertIn("Entre outros processos administrativos", body)
         self.assertIn("breve reunião, sem compromisso", body)
+        self.assertIn("solicitar diretamente um orçamento", body)
+        self.assertIn("https://timesaverautomate.com", body)
         self.assertIn("RASCUNHO NÃO ENVIADO", crm.draft_proposal(row))
         self.assertEqual(row[24], "Sim")
 
