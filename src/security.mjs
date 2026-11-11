@@ -104,3 +104,28 @@ export async function validDiagnosticToken(token,env,now=Date.now()){
     return sameDigest(parts[2],await keyedHash(key,DIAGNOSTIC_TOKEN_CONTEXT+parts[0]+'.'+parts[1]));
   }catch{return false;}
 }
+
+// Prova interna do limitador real; credencial e assinatura separadas do diagnóstico CRM.
+const RATE_PROBE_KEY_CONTEXT='time-saver-rate-probe-key-v1';
+const RATE_PROBE_TOKEN_CONTEXT='quote-rate-probe-v1:';
+async function rateProbeKey(env){
+  const key=env?.RESEND_API_KEY;
+  if(typeof key!=='string'||!/^re_[A-Za-z0-9_-]{8,256}$/.test(key))throw Error('rate_probe_configuration_invalid');
+  return keyedHash(key,RATE_PROBE_KEY_CONTEXT);
+}
+export async function issueRateProbeToken(env,now=Date.now(),session=crypto.randomUUID()){
+  if(!Number.isSafeInteger(now)||!/^\d{13}$/.test(String(now))||!DIAGNOSTIC_UUID.test(session))throw Error('rate_probe_input_invalid');
+  const key=await rateProbeKey(env),value=now+'.'+session;
+  return value+'.'+await keyedHash(key,RATE_PROBE_TOKEN_CONTEXT+value);
+}
+export async function validRateProbeToken(token,env,now=Date.now()){
+  if(typeof token!=='string'||token.length!==115||!Number.isSafeInteger(now))return false;
+  const parts=token.split('.');
+  if(parts.length!==3||!/^\d{13}$/.test(parts[0])||!DIAGNOSTIC_UUID.test(parts[1])||!/^[a-f0-9]{64}$/.test(parts[2]))return false;
+  const age=now-Number(parts[0]);
+  if(age < -5000 || age > 60000)return false;
+  try{
+    const key=await rateProbeKey(env);
+    return sameDigest(parts[2],await keyedHash(key,RATE_PROBE_TOKEN_CONTEXT+parts[0]+'.'+parts[1]));
+  }catch{return false;}
+}

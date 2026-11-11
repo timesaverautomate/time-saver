@@ -8,8 +8,10 @@ export const QUOTE_HEADERS = [
 ];
 const ROOT='https://sheets.googleapis.com/v4/spreadsheets/'+QUOTE_SHEET_ID;
 const RANGE=encodeURIComponent("'Pedidos do Site'!A1:R10000");
-const APPEND=encodeURIComponent("'Pedidos do Site'!A:R");
 const TOKEN='https://oauth2.googleapis.com/token';
+const QUOTE_TAB='Pedidos do Site';
+const MARKER_KEY='tq';
+const MAX_MARKER_CANDIDATES=8;
 
 function b64url(input){
   return btoa(input).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -97,26 +99,85 @@ export async function verifyQuoteSheet(env,{fetcher=fetch,authorize=googleToken}
   return {ready:true,existingRows:all.length-1};
 }
 
+export async function quoteMetadataId(reference,candidate=0){
+  if(!/^TS-[A-F0-9]{20}$/.test(reference)||!Number.isInteger(candidate)||candidate<0||candidate>=MAX_MARKER_CANDIDATES)
+    throw Error('quote_reference_invalid');
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(
+    'time-saver-quote-marker-v1:'+QUOTE_SHEET_ID+':'+reference+':'+candidate));
+  return (new DataView(digest).getUint32(0,false)&0x7fffffff)||1;
+}
+function existingQuote(all,data,reference,access){
+  const matches=all.map((row,index)=>index>0&&row[0]===reference?index:-1).filter(index=>index>0);
+  if(matches.length>1)throw Error('sheets_duplicate_or_missing');
+  if(matches.length===0)return null;
+  const index=matches[0],expected=quoteRow(data,reference,0),row=all[index];
+  for(let column=2;column<=13;column++){
+    if(String(row[column]??'').normalize('NFC')!==expected[column])throw Error('sheets_payload_conflict');
+  }
+  return {access,reference,rowNumber:index+1,status:row[14]||'',duplicate:true};
+}
+async function quoteSheetId(access,fetcher){
+  const result=await sheetCall(ROOT+'?fields=sheets(properties(sheetId,title))',access,fetcher);
+  if(!Array.isArray(result.sheets))throw Error('sheets_sheet_mismatch');
+  const matches=result.sheets.map(sheet=>sheet.properties).filter(properties=>properties?.title===QUOTE_TAB);
+  const id=matches[0]?.sheetId;
+  if(matches.length!==1||!Number.isInteger(id)||id<0||id>0x7fffffff)throw Error('sheets_sheet_mismatch');
+  return id;
+}
 export async function storeQuote(env,data,reference,received,{
-  fetcher=fetch,authorize=googleToken
+  fetcher=fetch,authorize=googleToken,metadataId=quoteMetadataId
 }={}){
   if(env.QUOTE_CRM_ENABLED!=='true')return null;
   if(!/^TS-[A-F0-9]{20}$/.test(reference))throw Error('quote_reference_invalid');
   const access=await authorize(env,fetcher);
   const all=await rows(access,fetcher);
-  const found=all.findIndex((r,i)=>i>0&&r[0]===reference);
-  if(found>=0)return {access,reference,rowNumber:found+1,status:all[found][14]||'',duplicate:true};
+  const found=existingQuote(all,data,reference,access);
+  if(found)return found;
+  // O leitor recusa >=10000 linhas: não criar uma linha que já não possa confirmar.
+  if(all.length>=9999)throw Error('sheets_read_limit');
+  const sheetId=await quoteSheetId(access,fetcher);
   const row=quoteRow(data,reference,received);
-  // Append encontra o fim dos dados. OVERWRITE preenche a linha vazia já formatada,
-  // sem inserir outra linha que herde o texto branco do cabeçalho ou desloque regras.
-  const result=await sheetCall(ROOT+'/values/'+APPEND+':append?valueInputOption=RAW&insertDataOption=OVERWRITE',access,fetcher,{
-    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({values:[row]})
-  });
-  if(result.updates?.updatedRows!==1)throw Error('sheets_insert_unconfirmed');
-  const verified=await rows(access,fetcher);
-  const match=verified.map((r,i)=>r[0]===reference?i:-1).filter(i=>i>0);
-  if(match.length!==1)throw Error('sheets_duplicate_or_missing');
-  return {access,reference,rowNumber:match[0]+1,status:'Pendente envio',duplicate:false};
+  for(let candidate=0;candidate<MAX_MARKER_CANDIDATES;candidate++){
+    const id=await metadataId(reference,candidate);
+    if(!Number.isInteger(id)||id<=0||id>0x7fffffff)throw Error('sheets_metadata_invalid');
+    // Sheets aplica o marcador único e a linha no mesmo batch atómico. Um ID já
+    // ocupado faz falhar o batch inteiro, sem acrescentar outra linha. O marcador
+    // não contém nome, email ou descrição, não expira e não é removido pela aplicação.
+    const requests=[
+      {createDeveloperMetadata:{developerMetadata:{metadataId:id,metadataKey:MARKER_KEY,
+        location:{sheetId},visibility:'DOCUMENT'}}},
+      {appendCells:{sheetId,rows:[{values:row.map(value=>({userEnteredValue:{stringValue:String(value)}}))}],
+        fields:'userEnteredValue'}}
+    ];
+    let result;
+    try{
+      result=await sheetCall(ROOT+':batchUpdate',access,fetcher,{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests})
+      });
+    }catch(error){
+      if(error?.message!=='sheets_api_400')throw error;
+      let occupied;
+      try{occupied=await sheetCall(ROOT+'/developerMetadata/'+id,access,fetcher);}
+      catch(lookupError){
+        if(lookupError?.message==='sheets_api_404')throw error;
+        throw lookupError;
+      }
+      if(occupied?.metadataId!==id)throw Error('sheets_metadata_invalid');
+      const current=await rows(access,fetcher);
+      const duplicate=existingQuote(current,data,reference,access);
+      if(duplicate)return duplicate;
+      // ID ocupado por outro pedido/aplicação; não alterar nem apagar o marcador.
+      // O candidato seguinte é determinístico para todos os executores.
+      continue;
+    }
+    if(result?.replies?.[0]?.createDeveloperMetadata?.developerMetadata?.metadataId!==id)
+      throw Error('sheets_insert_unconfirmed');
+    const verified=await rows(access,fetcher);
+    const inserted=existingQuote(verified,data,reference,access);
+    if(!inserted)throw Error('sheets_duplicate_or_missing');
+    return {...inserted,duplicate:false};
+  }
+  throw Error('sheets_metadata_collision_limit');
 }
 export async function markQuoteReceived(entry,providerId,{
   fetcher=fetch

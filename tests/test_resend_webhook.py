@@ -31,8 +31,8 @@ class WebhookTests(unittest.TestCase):
     def test_verified_dry_run_never_calls_sheets(self):
         client = webhook.app.test_client()
         with patch.object(webhook, "verified_payload", return_value={
-            "type": "email.bounced", "data": {"email_id": "test"}}), \\
-             patch.object(webhook, "google_session") as session, \\
+            "type": "email.bounced", "data": {"email_id": "test"}}), \
+             patch.object(webhook, "google_session") as session, \
              patch.dict("os.environ", {"RESEND_WEBHOOK_WRITE_ENABLED": "false"}):
             response = client.post("/webhooks/resend", data="{}")
         self.assertEqual(response.status_code, 200)

@@ -12,16 +12,21 @@ const DATA={
 };
 function fakeSheet(){
   const values=[QUOTE_HEADERS.slice()];
+  const metadata=new Map();
   let appends=0, updates=0;
   async function fetcher(url,init={}){
     const u=String(url);
-    if(u.includes('/values/')&&u.includes(':append')){
-      appends++;
+    if(u.endsWith(':batchUpdate')&&!u.endsWith('/values:batchUpdate')){
       assert.equal(init.method,'POST');
-      assert.match(u,/valueInputOption=RAW/);
       const payload=JSON.parse(init.body);
-      values.push(...payload.values);
-      return Response.json({updates:{updatedRows:1}});
+      const marker=payload.requests[0].createDeveloperMetadata.developerMetadata;
+      const append=payload.requests[1].appendCells;
+      if(metadata.has(marker.metadataId))return Response.json({error:{}},{status:400});
+      assert.equal(marker.metadataKey,'tq');assert.equal(marker.metadataValue,undefined);
+      assert.equal(append.sheetId,37);assert.equal(append.fields,'userEnteredValue');
+      metadata.set(marker.metadataId,marker);appends++;
+      values.push(...append.rows.map(row=>row.values.map(cell=>cell.userEnteredValue.stringValue)));
+      return Response.json({replies:[{createDeveloperMetadata:{developerMetadata:marker}},{}]});
     }
     if(u.endsWith('/values:batchUpdate')){
       updates++;
@@ -33,7 +38,12 @@ function fakeSheet(){
       values[rowNumber-1][17]=entries[1].values[0][1];
       return Response.json({totalUpdatedRows:1});
     }
-    if(u.includes('/values/'))return Response.json({values});
+    if(u.includes('/developerMetadata/')){
+      const id=Number(u.split('/').at(-1));
+      return metadata.has(id)?Response.json(metadata.get(id)):Response.json({error:{}},{status:404});
+    }
+    if(u.includes('?fields='))return Response.json({sheets:[{properties:{sheetId:37,title:'Pedidos do Site'}}]});
+    if(u.includes('/values/')&&!u.includes(':append'))return Response.json({values});
     throw Error('Unexpected mocked URL: '+u);
   }
   return {fetcher,values,stats:()=>({appends,updates})};

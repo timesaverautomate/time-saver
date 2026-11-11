@@ -71,7 +71,7 @@ test('proxy falha de forma fechada se a origem passar a incluir formulário ou d
   }
 });
 
-function deploymentFixture({settings=null,domains=[],dnsOccupied=false,certPending=false,rejectWWW=false,contact=false}={}) {
+function deploymentFixture({settings=null,domains=[],dnsOccupied=false,certPending=false,rejectWWW=false,contact=false,invalidRateSettings=false}={}) {
   const calls=[],uploads=[];let hsts=false;
   const env={GITHUB_REPOSITORY_ID:'1452563434',GITHUB_REPOSITORY:'timesaverautomate/time-saver',
     GITHUB_REF:'refs/heads/main',CLOUDFLARE_API_TOKEN:'unit-test-'.repeat(5)};
@@ -92,7 +92,14 @@ function deploymentFixture({settings=null,domains=[],dnsOccupied=false,certPendi
     }
     assert.equal(parsed.hostname,'api.cloudflare.com');
     if(path.endsWith('/accounts'))return json([{id:'a'.repeat(32)}]);
-    if(path.endsWith('/settings'))return settings?json(settings):new Response('',{status:404});
+    if(path.endsWith('/settings')){
+      if(uploads.length){
+        const bindings=structuredClone(uploads.at(-1).bindings);
+        if(invalidRateSettings){const rate=bindings.find(binding=>binding.name==='FORM_IP_RATE');if(rate)rate.simple.limit=500;}
+        return json({bindings});
+      }
+      return settings?json(settings):new Response('',{status:404});
+    }
     if(path.endsWith('/domains')) {
       if(options.method==='PUT') {
         const data=JSON.parse(options.body);
@@ -145,6 +152,16 @@ test('envio direto instala apenas módulos, segredos e contadores, preservando a
   assert.equal(metadata.bindings.some(b=>b.name==='SECURITY_HMAC_KEY'),false);
   assert.ok(metadata.bindings.every(b=>!['d1','kv_namespace','durable_object_namespace','queue'].includes(b.type)));
   assert.ok(f.calls.every(c=>!/billing|subscriptions|d1\/database/.test(c.url)));
+});
+test('publicação confirma contadores reais na Cloudflare e recusa configuração divergente',async()=>{
+  const settings={bindings:[{type:'plain_text',name:'TIME_SAVER_REPOSITORY_ID',text:'1452563434'},
+    {type:'secret_text',name:'SECURITY_HMAC_KEY'},{type:'plain_text',name:'HSTS_ENABLED',text:'true'}]};
+  const good=deploymentFixture({settings,contact:true});const accepted=await deploySiteDomain(good.options);
+  assert.equal(accepted.rateLimits.verified,true);assert.equal(accepted.rateLimits.bindings.length,3);
+  assert.equal(accepted.rateLimits.bindings.find(binding=>binding.name==='FORM_IP_RATE').limit,5);
+  const bad=deploymentFixture({settings,contact:true,invalidRateSettings:true});const rejected=await deploySiteDomain(bad.options);
+  assert.equal(rejected.verified,false);assert.equal(rejected.code,'rate_limit_settings_unverified');
+  assert.equal(bad.calls.some(call=>call.url.endsWith('/domains')&&call.options.method==='PUT'),false);
 });
 test('HSTS só é ativado após verificar HTTPS; certificado pendente ou www recusado nunca são sucesso',async()=>{
   const pending=deploymentFixture({certPending:true});

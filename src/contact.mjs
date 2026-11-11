@@ -1,5 +1,5 @@
 import { validateSubmission,readBoundedJSON,BodyTimeoutError } from './validation.mjs';
-import { keyedHash,sameDigest,validDiagnosticToken } from './security.mjs';
+import { keyedHash,sameDigest,validDiagnosticToken,validRateProbeToken } from './security.mjs';
 import { storeQuote,markQuoteReceived,verifyQuoteSheet } from './quote-sheets.mjs';
 
 const CONTACT_ORIGIN='https://timesaverautomate.com';
@@ -75,7 +75,7 @@ export async function parseContactToken(token,env,now=Date.now()){
   const signature=await keyedHash(env.SECURITY_HMAC_KEY,'contact-ticket:'+parts[0]+'.'+parts[1]);
   return sameDigest(parts[2],signature)?{created,nonce:parts[1]}:null;
 }
-export async function handleContact(request,env,transport=fetch){
+async function contactRequest(request,env,transport){
   const path=new URL(request.url).pathname;
   if(path==='/api/quote-crm-health'){
     if(request.method!=='GET'||!contactOrigin(request,false))return contactJSON({ready:false},403);
@@ -131,9 +131,15 @@ export async function handleContact(request,env,transport=fetch){
     let quoteEntry=null;
     if(env.QUOTE_CRM_ENABLED==='true'){
       try { quoteEntry=await storeQuote(env,data,reference,Date.now()); }
-      catch { return contactJSON({
+      catch(error) {
+        if(error?.message==='sheets_payload_conflict')return contactJSON({
+          message:'O pedido está a ser processado ou foi alterado. Aguarde um momento e tente novamente com os mesmos dados.',
+          renewKey:true
+        },409,{'Retry-After':'3'});
+        return contactJSON({
         message:'Não foi possível registar o pedido neste momento. Os campos foram mantidos; tente novamente.'
-      },503); }
+        },503);
+      }
     }
     const response=await transport('https://api.resend.com/emails',{
       method:'POST',redirect:'manual',signal:AbortSignal.timeout(12_000),
@@ -150,4 +156,22 @@ export async function handleContact(request,env,transport=fetch){
       renewKey:result?.name==='invalid_idempotent_request'},409,{'Retry-After':'3'});
     return contactJSON({message:'Não foi possível confirmar o envio. Os campos foram mantidos; aguarde um momento e tente novamente.'},502);
   }catch{return contactJSON({message:'O serviço está temporariamente indisponível. Os campos foram mantidos; tente novamente mais tarde.'},503);}
+}
+
+export async function handleContact(request,env,transport=fetch){
+  const response=await contactRequest(request,env,transport);
+  const probe=request.headers.get('X-Time-Saver-Rate-Probe');
+  // Não altera a decisão nem a chave do limitador. Apenas o executor interno
+  // autenticado recebe uma impressão por sessão, sem IP, tokens ou conteúdo.
+  if(new URL(request.url).pathname!=='/api/quote'||request.method!=='POST'
+    ||!probe||!contactConfigured(env)||!contactOrigin(request,true)
+    ||!await validRateProbeToken(probe,env))return response;
+  try{
+    const source=await contactSource(request,env),session=probe.split('.')[1];
+    const fingerprint=await keyedHash(env.SECURITY_HMAC_KEY,'rate-proof:'+session+':'+source);
+    const headers=new Headers(response.headers);
+    headers.set('X-Time-Saver-Rate-Source',fingerprint.slice(0,32));
+    headers.set('X-Time-Saver-Rate-Colo',/^[A-Z]{3}$/.test(request.cf?.colo||'')?request.cf.colo:'unknown');
+    return new Response(response.body,{status:response.status,headers});
+  }catch{return response;}
 }

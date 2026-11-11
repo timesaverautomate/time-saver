@@ -7,13 +7,14 @@ const HOSTS=[DOMAIN,'www.'+DOMAIN];
 const WORKER='time-saver-edge';
 const PROJECT='1452563434';
 const ID=/^[a-f0-9]{32}$/i;
+const RATE_LIMITS=[['FORM_IP_RATE','1452563434',5],['FORM_EDGE_RATE','1452563435',30],['FORM_TOKEN_RATE','1452563436',30]];
 class DomainError extends Error {
   constructor(code,httpStatus,operation){super(code);Object.assign(this,{code,httpStatus,operation});}
 }
 function requireDomain(value,code){if(!value)throw new DomainError(code);}
 
 export async function deploySiteDomain({env,source,modules={},fetcher=fetch,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),attempts=24,mask=()=>{}}) {
-  const attached=[];let installed=false;
+  const attached=[];let installed=false,rateLimitsVerified=false;
   try {
     requireDomain(env.GITHUB_REPOSITORY_ID===PROJECT && env.GITHUB_REPOSITORY==='timesaverautomate/time-saver'
       && env.GITHUB_REF==='refs/heads/main','unauthorised_repository');
@@ -89,9 +90,7 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
         if(sheetRequested)bindings.push({type:'secret_text',
           name:'GOOGLE_SERVICE_ACCOUNT_JSON',text:env.GOOGLE_SERVICE_ACCOUNT_JSON});
         if(hmac)bindings.push({type:'secret_text',name:'SECURITY_HMAC_KEY',text:hmac});
-        bindings.push(...[
-          ['FORM_IP_RATE','1452563434',5],['FORM_EDGE_RATE','1452563435',30],['FORM_TOKEN_RATE','1452563436',30]
-        ].map(([name,namespace_id,limit])=>({type:'ratelimit',name,namespace_id,simple:{limit,period:60}})));
+        bindings.push(...RATE_LIMITS.map(([name,namespace_id,limit])=>({type:'ratelimit',name,namespace_id,simple:{limit,period:60}})));
       }
       form.set('metadata',new Blob([JSON.stringify({main_module:'proxy.mjs',compatibility_date:'2026-11-01',
         observability:{enabled:false},keep_bindings:['secret_text'],bindings})],{type:'application/json'}),'metadata.json');
@@ -103,6 +102,13 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
       }
       await cf(base+'/workers/scripts/'+WORKER,{method:'PUT',body:form,operation:'worker_upload'});
       installed=true;
+      if(formRequested){
+        const stored=await cf(base+'/workers/scripts/'+WORKER+'/settings',{operation:'verify_rate_limit_settings'});
+        rateLimitsVerified=RATE_LIMITS.every(([name,namespace,limit])=>stored.bindings?.some(binding=>
+          binding.type==='ratelimit'&&binding.name===name&&String(binding.namespace_id)===namespace
+          &&binding.simple?.limit===limit&&binding.simple?.period===60));
+        requireDomain(rateLimitsVerified,'rate_limit_settings_unverified');
+      }
     }
     await upload();
     await cf(base+'/workers/scripts/'+WORKER+'/subdomain',{
@@ -162,6 +168,7 @@ export async function deploySiteDomain({env,source,modules={},fetcher=fetch,slee
       zoneTLS={...await hardenZoneTLS({zoneId,cf:(path,options)=>cf(path,{...options,credential:zoneCredential})}),credentialFallbackAttempted:true};
     }
     return {configured:true,verified,installed,attached,contactApiConfigured:formRequested&&verified,zoneTLS,
+      ...(formRequested?{rateLimits:{verified:rateLimitsVerified,bindings:RATE_LIMITS.map(([name,namespace_id,limit])=>({name,namespace_id,limit,period:60}))}}:{}),
       code:verified?(formRequested?'domain_and_contact_api_verified':'domain_and_security_verified'):'hsts_verification_pending'};
   }catch(error){return {configured:attached.length>0,verified:false,installed,attached,
     code:error instanceof DomainError?error.code:'domain_setup_failed',

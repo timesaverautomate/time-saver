@@ -1,6 +1,11 @@
 name: Ligar domínio e proteger site público
 on:
   workflow_dispatch:
+    inputs:
+      verify_real_quote:
+        description: Verificar um pedido interno real e simultâneo no CRM
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -16,10 +21,13 @@ on:
       - 'scripts/deploy-site-domain.mjs'
       - 'scripts/run-site-domain.mjs'
       - 'scripts/verify-quote-sheet.mjs'
+      - 'scripts/verify-quote-atomic-provider.mjs'
       - 'scripts/check-quote-health.mjs'
       - 'scripts/zone-security.mjs'
       - 'scripts/probe-public-tls.mjs'
       - 'scripts/site-settings.mjs'
+      - 'scripts/probe-live-rate-limit.mjs'
+      - 'scripts/probe-live-quote-concurrency.mjs'
 permissions: {}
 concurrency:
   group: time-saver-site-domain
@@ -50,6 +58,10 @@ jobs:
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: node scripts/verify-quote-sheet.mjs
+      - name: Verificar atomicidade Sheets numa folha temporária
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: node scripts/verify-quote-atomic-provider.mjs
       - name: Ligar domínio e verificar HTTPS e cabeçalhos
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -63,3 +75,12 @@ jobs:
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: node scripts/check-quote-health.mjs
+      - name: Verificar bloqueio e reset do rate limit sem criar pedidos
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: node scripts/probe-live-rate-limit.mjs
+      - name: Verificar um pedido interno simultâneo e único no CRM
+        if: contains(github.event.head_commit.message, '[security-verify-live]') || (github.event_name == 'workflow_dispatch' && inputs.verify_real_quote)
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: node scripts/probe-live-quote-concurrency.mjs
