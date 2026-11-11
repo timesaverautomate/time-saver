@@ -87,6 +87,23 @@ class ProspectCrmTests(unittest.TestCase):
         without_email[4] = ""
         self.assertLess(crm.prospect_score(without_email), crm.prospect_score(row))
 
+    def test_send_gate_fails_closed(self):
+        row = crm.candidate(sample(), "Porto")
+        review = crm.review_row(row, 2)
+        allowed, reason = crm.evaluate_send_eligibility(row, review)
+        self.assertFalse(allowed)
+        self.assertIn("Não contactar", reason)
+        row[24] = "Não"
+        review[8] = "Verificado"
+        review[9] = "Consentimento documentado"
+        self.assertTrue(crm.evaluate_send_eligibility(row, review)[0])
+        self.assertFalse(crm.evaluate_send_eligibility(row, review, {"geral@alfa.pt"})[0])
+        review[9] = "Por avaliar"
+        self.assertFalse(crm.evaluate_send_eligibility(row, review)[0])
+        review[9] = "Consentimento documentado"
+        row[20] = "1"
+        self.assertFalse(crm.evaluate_send_eligibility(row, review)[0])
+
     def test_reject_personal_email(self):
         self.assertIsNone(crm.candidate(sample(email="joana@alfa.pt"), "Porto"))
 
