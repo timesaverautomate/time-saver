@@ -1,0 +1,59 @@
+name: Regenerar prova de compilação do webhook Resend
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: timesaver-resend-build-proof
+  cancel-in-progress: false
+jobs:
+  regenerate:
+    if: github.repository == 'timesaverautomate/time-saver' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Compile with pinned Wrangler (no deployment)
+        run: npx --yes wrangler@4.160.0 deploy --dry-run --outdir .resend-proof-build --config wrangler.toml
+      - name: Regenerate manifest and pinned regression expectations
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,pathlib,re
+          root=pathlib.Path('.')
+          out=root/'.resend-proof-build'
+          candidates=[p for p in out.rglob('*.js') if p.is_file() and not p.name.endswith('.map')]
+          if len(candidates)!=1:
+              raise SystemExit(f'Expected one compiled JavaScript module, got {len(candidates)}')
+          def digest(p):
+              b=p.read_bytes()
+              return hashlib.sha256(b).hexdigest(),len(b)
+          source_hash,source_bytes=digest(root/'workers/resend-webhook.js')
+          config_hash,_=digest(root/'wrangler.toml')
+          compiled_hash,compiled_bytes=digest(candidates[0])
+          manifest={'schemaVersion':1,'builder':'wrangler@4.160.0','sourceFile':'workers/resend-webhook.js','sourceSha256':source_hash,'sourceBytes':source_bytes,'configFile':'wrangler.toml','configSha256':config_hash,'compiledSha256':compiled_hash,'compiledBytes':compiled_bytes}
+          (root/'workers/resend-webhook.build.json').write_text(json.dumps(manifest,indent=2)+'\n')
+          test=root/'tests/webhook-readonly.test.mjs'
+          s=test.read_text()
+          s,n=re.subn(r'assert\.equal\(manifest\.compiledBytes,\d+\);assert\.equal\(manifest\.compiledSha256,\x27[a-f0-9]{64}\x27\);',f"assert.equal(manifest.compiledBytes,{compiled_bytes});assert.equal(manifest.compiledSha256,'{compiled_hash}');",s)
+          if n!=1:raise SystemExit('Expected exactly one pinned compiled-proof assertion')
+          test.write_text(s)
+          PY
+      - name: Validate all tests
+        run: npm run check
+      - name: Commit only regenerated proof and pinned test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- workers/resend-webhook.build.json tests/webhook-readonly.test.mjs
+          if git diff --cached --quiet; then echo "Proof already current"; exit 0; fi
+          git commit -m "Regenerate pinned Resend Worker build proof"
+          git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push origin HEAD:main
