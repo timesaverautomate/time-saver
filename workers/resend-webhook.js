@@ -227,7 +227,7 @@ export class CrmEventCoordinator {
         // Single-fixture write gate. Production remains read-only by default.
         // No other message ID, event, row, or column may ever be written by this release.
         const fixture=event.type==="email.delivered" &&
-          event.data.email_id==="01a1ca54-de27-7648-bf79-32182001f650" &&
+          event.data.email_id==="01a1ca94-4663-7eee-93bc-6fd01eccf4f4" &&
           plan.matched && plan.updates.length===1 &&
           plan.updates[0].range==="'Pedidos'!V25" &&
           plan.updates[0].values?.[0]?.[0]==="Entregue";
