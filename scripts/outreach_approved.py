@@ -152,7 +152,7 @@ def batch_cells(credentials, updates, http=requests):
     if len(updates) > 10:
         raise ValueError("Demasiadas alterações de uma só vez")
     for entry in updates:
-        if not re.fullmatch(r"'Pedidos'![A-Z]{1,2}[2-9][0-9]*(:[A-Z]{1,2}[2-9][0-9]*)?", entry["range"]):
+        if not re.fullmatch(r"'Pedidos'![A-Z]{1,2}(?:[2-9]|[1-9][0-9]+)(?::[A-Z]{1,2}(?:[2-9]|[1-9][0-9]+))?", entry["range"]):
             raise ValueError("Intervalo de escrita não aprovado")
     response = http.post(
         crm.API + "/values:batchUpdate",
