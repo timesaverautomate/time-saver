@@ -114,8 +114,8 @@ def select_approved(crm_rows, reviews, today=None, limit=MAX_OUTREACH_PER_DAY):
         # Empresas comprovadamente com 50 ou mais trabalhadores ficam fora
         # deste funil; dimensões desconhecidas seguem para análise, não
         # são classificadas artificialmente como pequenas.
-        if crm.size_priority(row) is None:
-            reasons["Empresa acima do limite de dimensão (50+)"] += 1
+        if not crm.in_target_segment(row):
+            reasons["Fora dos limites de dimensão ou CAE documentados"] += 1
             continue
         allowed, reason = crm.evaluate_send_eligibility(row, review, suppression, today=today)
         if not allowed:
