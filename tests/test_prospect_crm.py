@@ -72,6 +72,21 @@ class ProspectCrmTests(unittest.TestCase):
         self.assertEqual(existing[8], "Verificado")
         self.assertEqual(existing[10], "Decisão humana preservada")
 
+    def test_scoring_and_draft_never_authorize_send(self):
+        row = crm.candidate(sample(), "Porto")
+        row[1] = "accountant"
+        row[8] = "Alta"
+        row[7] = "Automatizar relatórios Excel"
+        self.assertGreaterEqual(crm.prospect_score(row), 7)
+        review = crm.review_row(row, 2)
+        self.assertIn("RASCUNHO NÃO ENVIADO", review[10])
+        self.assertEqual(review[8], "Por verificar")
+        self.assertEqual(review[9], "")
+        self.assertEqual(row[24], "Sim")
+        without_email = list(row)
+        without_email[4] = ""
+        self.assertLess(crm.prospect_score(without_email), crm.prospect_score(row))
+
     def test_reject_personal_email(self):
         self.assertIsNone(crm.candidate(sample(email="joana@alfa.pt"), "Porto"))
 
