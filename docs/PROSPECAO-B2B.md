@@ -48,3 +48,15 @@ Registar por zona/setor: candidatos descobertos, novos após deduplicação, sit
 - Agenda diária `prospect-crm.yml`: recolha de novos candidatos bloqueados e sincronização da revisão; horário 08:15 UTC.
 - Agenda de dias úteis `outreach-legal.yml`: verifica consentimentos documentados e, apenas nesse caso, envia até 5 mensagens autorizadas. Também reconcilia entregas. **Se não houver autorização documentada, 0 envios é o comportamento correto.**
 - O Resend proíbe mensagens não solicitadas e dados recolhidos por scraping, conforme a política em https://resend.com/legal/acceptable-use (atualização 13/10/2026). Conformidade legal e aprovação contratual do fornecedor são verificações distintas.
+
+## Teste de integração validado — 11/11/2026
+
+Execução GitHub Actions: https://github.com/timesaverautomate/time-saver/actions/runs/43077489175
+
+- 58 testes unitários passaram, incluindo deduplicação, elegibilidade, envio opt-in mockado, tracking e consulta Overpass por caixa empresarial.
+- Teste vivo: leitura autenticada do Google Sheets CRM com 26 registos.
+- Pesquisa de 8 zonas (5 suburbanas, 2 regionais, 1 centro): **8 consultas com sucesso; 0 falhas; 11 candidatos novos** após deduplicação em memória.
+- Distribuição da amostra: Leça da Palmeira 1, Senhora da Hora 2, São Mamede de Infesta 1, Oeiras 0, Queluz 0, Ílhavo 0, Águeda 2 e Lisboa 5.
+- Modo `simular`: **0 escritas no CRM, 0 emails enviados**.
+- Uma execução anterior com consultas radiais via POST falhou devido a timeouts e HTTP 502; foi corrigida com instância Overpass Europa, queries delimitadas por bounding box e GET.
+- **Não confundir** esta validação com a execução agendada de escrita real, nem com aprovação para contacto comercial. As duas dependem respetivamente de disponibilidade da fonte e de validação/autorização humana.
