@@ -236,8 +236,15 @@ export class CrmEventCoordinator {
           return response({accepted:true,mode:"fixture_write",crm_writes_enabled:true,
             crm_check:"ok",matched:true,planned_cells:1,...result});
         }
+        // General CRM writer is prepared but explicitly disabled until a separate
+        // production approval. The fixture flag cannot activate general writes.
+        if (this.env.RESEND_CRM_GENERAL_WRITE_ENABLED === "true" && plan.matched && plan.updates.length > 0) {
+          const result = await writePlannedCrmCells(this.env.GOOGLE_SERVICE_ACCOUNT_JSON, plan.updates);
+          return response({accepted:true,mode:"crm_write",crm_writes_enabled:true,
+            crm_check:"ok",matched:true,planned_cells:plan.updates.length,...result});
+        }
         const {updates,...summary}=plan;
-        return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:"ok",...summary,diagnostic:{write_flag_enabled:this.env.RESEND_WEBHOOK_WRITE_ENABLED==="true",fixture_eligible:Boolean(fixture)}});
+        return response({accepted:true,mode:"dry_run",crm_writes_enabled:false,crm_check:"ok",...summary,diagnostic:{write_flag_enabled:this.env.RESEND_WEBHOOK_WRITE_ENABLED==="true",fixture_eligible:Boolean(fixture),general_write_enabled:this.env.RESEND_CRM_GENERAL_WRITE_ENABLED==="true"}});
       } catch(error) {
         const safe=new Set(["invalid_credentials","google_auth_failed","google_sheet_read_failed","crm_schema_mismatch","duplicate_message_id","google_sheet_write_failed","google_sheet_write_incomplete"]);
         const reason=safe.has(error?.message)?error.message:"crm_check_failed";
