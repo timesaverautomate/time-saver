@@ -196,7 +196,7 @@ def candidate(element, city, zone_type="centro"):
     row[24] = "Sim"  # Sem desbloqueio automático de prospeção.
     row[25] = f"osm:{osm_type}:{osm_id}"
     score = prospect_score(row)
-    row[8] = "Alta" if score >= 65 else "Média" if score >= 40 else "Baixa"
+    row[8] = "Alta" if score >= 65 else "Média" if score >= 30 else "Baixa"
     return row
 
 
@@ -381,6 +381,45 @@ def sector_priority(row):
     return 2
 
 
+# A informação CAE não é inferida das categorias OSM: só conta quando
+# um humano fornece fonte verificável; os restantes recorrem ao setor OSM.
+CAE_EVIDENCE = re.compile(r"\bCAE_VERIFICADO=(\d{5})\b")
+CAE_SOURCE = re.compile(r"\bFONTE_CAE=https?://[^\s;]+")
+# Fora do foco: administração pública, apostas, famílias empregadoras
+# e organizações extraterritoriais. O restante fica elegível para triagem.
+EXCLUDED_CAE_PREFIXES = {"84", "92", "97", "98", "99"}
+PRIMARY_CAE_PREFIXES = {"46", "68", "69"}
+SECONDARY_CAE_PREFIXES = {
+    "33", "41", "42", "43", "47", "49", "52", "53",
+    "62", "63", "66", "70", "71", "73", "74", "77",
+    "78", "79", "80", "81", "82", "85", "86", "95", "96",
+}
+
+
+def verified_cae(row):
+    """CAE apenas quando o código e a origem estão ambos documentados."""
+    notes = str(row[16]) if len(row) > 16 else ""
+    code = CAE_EVIDENCE.search(notes)
+    if not code or not CAE_SOURCE.search(notes):
+        return None
+    return code.group(1)
+
+
+def cae_priority(row):
+    """0=setores alvo, 1=adjacentes, 2=outros; None=exclusão documentada."""
+    code = verified_cae(row)
+    if not code:
+        return sector_priority(row)
+    prefix = code[:2]
+    if prefix in EXCLUDED_CAE_PREFIXES:
+        return None
+    if prefix in PRIMARY_CAE_PREFIXES:
+        return 0
+    if prefix in SECONDARY_CAE_PREFIXES:
+        return 1
+    return 2
+
+
 def geography_priority(row):
     notes = str(row[16]) if len(row) > 16 else ""
     if "TIPO_ZONA=suburbio" in notes:
@@ -390,35 +429,38 @@ def geography_priority(row):
     return 2
 
 
-def lead_priority_key(row):
-    """Prioridade LEXICOGRÁFICA: dimensão > setor > localização > contacto.
+def in_target_segment(row):
+    """Não bloquear dimensão/CAE desconhecidos; nunca presumir que são pequenos."""
+    return size_priority(row) is not None and cae_priority(row) is not None
 
-    Nunca permitir que um CAE ou uma capital com score alto ultrapasse uma
-    micro/pequena empresa com dimensão efetivamente verificada.
+
+def lead_priority_key(row):
+    """Ordenação: dimensão > cidade/zona > CAE/setor > consistência de contacto.
+
+    O CAE verificado substitui a categoria OSM; em caso de desconhecimento,
+    esta serve só como sinal inicial, não como CAE oficial.
     """
     size = size_priority(row)
-    if size is None:
+    cae = cae_priority(row)
+    if size is None or cae is None:
         return (99, 99, 99, 99)
     website = str(row[3]) if len(row) > 3 else ""
     email = str(row[4]).strip().lower() if len(row) > 4 else ""
     match = int(bool(domain(website) and email.endswith("@" + domain(website))))
-    return (size, sector_priority(row), geography_priority(row), -match)
+    return (size, geography_priority(row), cae, -match)
 
 
 def prospect_score(row):
-    """Score explicativo; a ordem de pesquisa usa lead_priority_key."""
-    size = size_priority(row)
-    if size is None:
+    """Pontuação auxiliar (0-100); apenas lead_priority_key decide a ordem."""
+    if not in_target_segment(row):
         return 0
-    sector_points = {0: 25, 1: 15, 2: 5}[sector_priority(row)]
-    zone_points = {0: 10, 1: 6, 2: 2}[geography_priority(row)]
-    size_points = {0: 50, 1: 45, 2: 10, 3: 0}[size]
+    size_points = {0: 60, 1: 52, 2: 12, 3: 4}[size_priority(row)]
+    zone_points = {0: 20, 1: 12, 2: 5}[geography_priority(row)]
+    cae_points = {0: 15, 1: 10, 2: 3}[cae_priority(row)]
     website = str(row[3]) if len(row) > 3 else ""
     email = str(row[4]).strip().lower() if len(row) > 4 else ""
-    contact_points = 10 if domain(website) and email.endswith("@" + domain(website)) else 0
-    notes = str(row[16]) if len(row) > 16 else ""
-    process_points = 5 if "PROCESSO_VALIDADO=Sim" in notes else 0
-    return min(100, size_points + sector_points + zone_points + contact_points + process_points)
+    contact_points = 5 if domain(website) and email.endswith("@" + domain(website)) else 0
+    return min(100, size_points + zone_points + cae_points + contact_points)
 
 
 def proposal_content(row, verified_hook=""):
@@ -697,19 +739,20 @@ def balanced_candidates(groups, limit):
 
 
 def prioritized_candidates(groups, limit):
-    """Preencher primeiro com os menores, depois diminuir a exigência setorial.
+    """Escalões de dimensão, depois zona, e só depois CAE/setor.
 
-    Diversificar localizações *dentro* de cada nível; a distribuição geográfica
-    nunca tem precedência sobre uma micro/pequena empresa verificada.
+    O preenchimento é progressivo: prioridade alta até à quota, alargando
+    aos escalões inferiores quando o volume do escalão anterior é insuficiente.
+    Diversifica cidades dentro do mesmo escalão de prioridade.
     """
     ranked = sorted({
-        lead_priority_key(row)[:2]
-        for group in groups for row in group if size_priority(row) is not None
+        lead_priority_key(row)[:3]
+        for group in groups for row in group if in_target_segment(row)
     })
     output = []
     for rank in ranked:
         tier_groups = [
-            [row for row in group if lead_priority_key(row)[:2] == rank]
+            [row for row in group if lead_priority_key(row)[:3] == rank]
             for group in groups
         ]
         output.extend(balanced_candidates(tier_groups, limit - len(output)))
@@ -735,20 +778,18 @@ def find_candidates(existing, limit, day=None):
         lat_delta = radius / 111_320
         lon_delta = radius / (111_320 * max(0.2, math.cos(math.radians(lat))))
         bbox = f"{lat-lat_delta:.5f},{lon-lon_delta:.5f},{lat+lat_delta:.5f},{lon+lon_delta:.5f}"
-        # O setor limita apenas os negócios obviamente alheios aos serviços;
-        # primeiro procura-se micro/pequenas e depois alarga-se a outras áreas.
-        offices = "^(accountant|estate_agent|consulting|insurance|company|logistics|lawyer|architect|employment_agency|financial|administrative)$"
-        shops = "^(wholesale|trade|office_supplies|computer|hardware|electronics|pet|furniture|car_parts|stationery)$"
-        crafts = "^(carpenter|electrician|plumber|hvac)$"
+        # Recolhe setores empresariais amplos e aplica depois os escalões
+        # de prioridade. Assim, não desaparecem pequenas empresas de
+        # setores secundários só porque não constam de uma regex restrita.
         query = (
             "[out:json][timeout:20];("
-            f'nwr({bbox})["office"~"{offices}"]["name"]["contact:email"];'
-            f'nwr({bbox})["office"~"{offices}"]["name"]["email"];'
-            f'nwr({bbox})["shop"~"{shops}"]["name"]["contact:email"];'
-            f'nwr({bbox})["shop"~"{shops}"]["name"]["email"];'
-            f'nwr({bbox})["craft"~"{crafts}"]["name"]["contact:email"];'
-            f'nwr({bbox})["craft"~"{crafts}"]["name"]["email"];'
-            ");out tags 250;"
+            f'nwr({bbox})["office"]["name"]["contact:email"];'
+            f'nwr({bbox})["office"]["name"]["email"];'
+            f'nwr({bbox})["shop"]["name"]["contact:email"];'
+            f'nwr({bbox})["shop"]["name"]["email"];'
+            f'nwr({bbox})["craft"]["name"]["contact:email"];'
+            f'nwr({bbox})["craft"]["name"]["email"];'
+            ");out tags 600;"
         )
         elements = None
         for endpoint in ENDPOINTS[:2]:
@@ -778,7 +819,7 @@ def find_candidates(existing, limit, day=None):
         local = []
         for element in elements:
             row = candidate(element, city, kind)
-            if row is not None and size_priority(row) is not None and not is_duplicate(row, seen):
+            if row is not None and in_target_segment(row) and not is_duplicate(row, seen):
                 local.append(row)
         # A fonte não devolve os elementos por potencial comercial.
         local.sort(key=lead_priority_key)
@@ -811,7 +852,7 @@ def prepare_rows_for_write(latest, candidates, limit, day=None):
     fresh = []
     for source in sorted(candidates, key=lead_priority_key):
         row = list(source)
-        if size_priority(row) is None:
+        if not in_target_segment(row):
             continue
         if is_duplicate(row, keys):
             continue
