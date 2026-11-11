@@ -129,13 +129,13 @@ export async function verifySvix(body, headers, secret, now = Date.now()) {
 
 const CRM_ID = "1VYEBWJb_9cYGbO8nZa3d_qh1rLUH-H3xf-w4CnOLMS4";
 function b64url(bytes) { let s = ""; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
-export async function googleToken(json, http = fetch) {
+export async function googleToken(json, http = fetch, scope = "https://www.googleapis.com/auth/spreadsheets.readonly") {
   let c;
   try { c = JSON.parse(json); } catch { throw Error("invalid_credentials"); }
   if (c?.type !== "service_account" || !c.client_email || !c.private_key) throw Error("invalid_credentials");
   const now = Math.floor(Date.now()/1000);
   const enc = x => b64url(new TextEncoder().encode(JSON.stringify(x)));
-  const unsigned = enc({alg:"RS256",typ:"JWT"})+"."+enc({iss:c.client_email,scope:"https://www.googleapis.com/auth/spreadsheets.readonly",aud:"https://oauth2.googleapis.com/token",iat:now,exp:now+3600});
+  const unsigned = enc({alg:"RS256",typ:"JWT"})+"."+enc({iss:c.client_email,scope, aud:"https://oauth2.googleapis.com/token",iat:now,exp:now+3600});
   const der = Uint8Array.from(atob(c.private_key.replace(/-----[^-]+-----|\s/g,"")), x=>x.charCodeAt(0));
   const key = await crypto.subtle.importKey("pkcs8",der,{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["sign"]);
   const signature = b64url(new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5",key,new TextEncoder().encode(unsigned))));
@@ -163,6 +163,31 @@ export function planCrmEvent(rows,event) {
     updates.push({range:"'Pedidos'!Y"+number,values:[["Sim"]]});
   return {matched:true,planned_cells:updates.length,updates};
 }
+// Adapter for a future serialized writer. Never called by the public webhook yet.
+// A Sheets batchUpdate is not compare-and-swap: concurrency control must precede activation.
+export async function writePlannedCrmCells(credentialsJson, updates, http = fetch) {
+  if (!Array.isArray(updates) || updates.length === 0) return {written_cells:0};
+  if (updates.length > 2 || updates.some(u =>
+    !/^'Pedidos'![VY][2-9][0-9]*$/.test(u.range) ||
+    !Array.isArray(u.values) || u.values.length !== 1 ||
+    !Array.isArray(u.values[0]) || u.values[0].length !== 1 ||
+    typeof u.values[0][0] !== "string" ||
+    (u.range.includes("!Y") && u.values[0][0] !== "Sim")
+  )) throw Error("invalid_crm_updates");
+  const rowNumbers = updates.map(u => u.range.match(/[0-9]+$/)[0]);
+  if (new Set(rowNumbers).size !== 1 || new Set(updates.map(u=>u.range)).size !== updates.length)
+    throw Error("invalid_crm_updates");
+  const token = await googleToken(credentialsJson, http, "https://www.googleapis.com/auth/spreadsheets");
+  const url = "https://sheets.googleapis.com/v4/spreadsheets/"+CRM_ID+"/values:batchUpdate";
+  const r = await http(url, {method:"POST",headers:{
+    authorization:"Bearer "+token,"content-type":"application/json"
+  },body:JSON.stringify({valueInputOption:"RAW",data:updates})});
+  if (!r.ok) throw Error("google_sheet_write_failed");
+  const result = await r.json();
+  if (result.totalUpdatedCells !== updates.length) throw Error("google_sheet_write_incomplete");
+  return {written_cells:result.totalUpdatedCells};
+}
+
 export async function checkCrm(json,event,http=fetch) {
   const token=await googleToken(json,http);
   const url="https://sheets.googleapis.com/v4/spreadsheets/"+CRM_ID+"/values/"+encodeURIComponent("'Pedidos'!A1:Z5000");
