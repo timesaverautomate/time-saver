@@ -23,15 +23,19 @@ function decodeBase64(s) {
   return Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
 }
 
-export async function verifySvix(body, headers, secret, now = Date.now()) {
+export async function verifySvixDetailed(body, headers, secret, now = Date.now()) {
   const id = headers.get("svix-id");
   const timestamp = headers.get("svix-timestamp");
   const signatures = headers.get("svix-signature");
-  if (!id || !timestamp || !signatures || !secret?.startsWith("whsec_")) return false;
-  if (!/^\d+$/.test(timestamp)) return false;
-  if (Math.abs(now / 1000 - Number(timestamp)) > 300) return false;
+  if (!id || !timestamp || !signatures) return { valid: false, reason: "missing_headers" };
+  if (!secret?.startsWith("whsec_")) return { valid: false, reason: "secret_missing_or_invalid_format" };
+  if (!/^\d+$/.test(timestamp)) return { valid: false, reason: "invalid_timestamp" };
+  if (Math.abs(now / 1000 - Number(timestamp)) > 300) {
+    return { valid: false, reason: "timestamp_outside_5_min_window" };
+  }
   let key;
-  try { key = decodeBase64(secret.slice(6)); } catch { return false; }
+  try { key = decodeBase64(secret.slice(6)); }
+  catch { return { valid: false, reason: "invalid_secret_encoding" }; }
   const cryptoKey = await crypto.subtle.importKey(
     "raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
   );
@@ -40,10 +44,16 @@ export async function verifySvix(body, headers, secret, now = Date.now()) {
   for (const entry of signatures.split(" ")) {
     if (!entry.startsWith("v1,")) continue;
     try {
-      if (constantTimeEqual(expected, decodeBase64(entry.slice(3)))) return true;
+      if (constantTimeEqual(expected, decodeBase64(entry.slice(3)))) {
+        return { valid: true, reason: "verified" };
+      }
     } catch { /* malformed signature */ }
   }
-  return false;
+  return { valid: false, reason: "signature_mismatch" };
+}
+
+export async function verifySvix(body, headers, secret, now = Date.now()) {
+  return (await verifySvixDetailed(body, headers, secret, now)).valid;
 }
 
 export default {
@@ -62,7 +72,10 @@ export default {
     if (new TextEncoder().encode(body).length > 65536) {
       return response({ error: "too_large" }, 413);
     }
-    if (!await verifySvix(body, request.headers, env.RESEND_WEBHOOK_SECRET)) {
+    const verification = await verifySvixDetailed(body, request.headers, env.RESEND_WEBHOOK_SECRET);
+    if (!verification.valid) {
+      // Registar apenas a categoria do erro, nunca headers, corpo ou segredo.
+      console.warn("resend_webhook_verification_failed", verification.reason);
       return response({ error: "unauthorized" }, 401);
     }
     let event;
