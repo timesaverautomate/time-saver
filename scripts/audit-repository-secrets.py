@@ -13,6 +13,8 @@ FIXTURES = {
     "re_test_only_deployment",
     "re_only_for_diagnostic_unit_tests",
     "unit-test-value-never-use-in-production-",
+    # Prefixo literal de uma credencial sintética construída com .repeat() num teste.
+    "unit-test-cloudflare-key-",
 }
 # JSON de contas de serviço guarda o PEM com \n escapado; ficheiros .env podem
 # conter mais um nível de escape. Exigir o bloco completo evita confundir os

@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'scripts/audit-repository-secrets.py'
+      - 'tests/secret-audit.test.mjs'
       - 'workers/resend-webhook.js'
       - 'scripts/deploy-resend-webhook.mjs'
       - '.github/workflows/webhook-security.yml'

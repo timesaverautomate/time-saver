@@ -13,6 +13,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'scripts/audit-repository-secrets.py'
+      - 'tests/secret-audit.test.mjs'
       - '.github/workflows/prospect-crm.yml'
       - 'scripts/prospect_crm.py'
       - 'tests/test_prospect_crm.py'

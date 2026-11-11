@@ -113,3 +113,17 @@ test('padrões e instruções de segredos escapados não geram falsos positivos'
     assert.equal(result.status,0);assert.equal(JSON.parse(result.stdout).passed,true);
   } finally {rmSync(repo.directory,{recursive:true,force:true});}
 });
+
+test('exceção da fixture Cloudflare é exata e não isenta tokens desconhecidos',()=>{
+  const repo=repository();
+  try{
+    writeFileSync(path.join(repo.directory,'fixture.js'),"const env={CLOUDFLARE_API_TOKEN:'unit-test-cloudflare-key-'.repeat(2)};\n");repo.commit();
+    let result=spawnSync('python',[script,'--repository',repo.directory],{encoding:'utf8'});
+    assert.equal(result.status,0);
+    const value='X'.repeat(32);
+    writeFileSync(path.join(repo.directory,'config.env'),'CLOUDFLARE_API_TOKEN="'+value+'"\n');repo.commit();
+    result=spawnSync('python',[script,'--repository',repo.directory],{encoding:'utf8'});
+    assert.equal(result.status,1);assert.ok(JSON.parse(result.stdout).findings.some(x=>x.rule==='secret-assignment'));
+    assert.equal(result.stdout.includes(value),false);
+  }finally{rmSync(repo.directory,{recursive:true,force:true});}
+});
