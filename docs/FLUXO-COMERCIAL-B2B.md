@@ -6,7 +6,7 @@
 2. **CRM** — `Pedidos` guarda empresa, website, email genérico, telefone, fonte, estado e deduplicação. Novas linhas entram obrigatoriamente com `Y=Sim` e `X=Por avaliar`.
 3. **Revisão** — `Revisão Comercial` apresenta o candidato e uma proposta orientada ao setor; a empresa não passa automaticamente à fase seguinte.
 4. **Aprovação** — a TimeSaver verifica empresa, endereço, oposição DGC quando aplicável e regista os comprovativos no CRM.
-5. **Envio** — `.github/workflows/outreach-legal.yml` pesquisa apenas linhas aprovadas, de segunda a sexta às 09:30 UTC. Máximo cinco empresas/dia, nunca duas vezes para o mesmo domínio.
+5. **Envio via Resend (apenas opt-in)** — `.github/workflows/outreach-legal.yml` pesquisa apenas linhas com consentimento documentado e aprovação, de segunda a sexta às 09:30 UTC. Máximo cinco/dia, nunca duas vezes para o mesmo domínio. **A prospeção fria está bloqueada neste fornecedor.**
 6. **Acompanhamento** — o mesmo workflow consulta os últimos eventos do Resend diariamente às 16:30 UTC e atualiza estados no Sheets.
 7. **Resposta e oportunidades** — o email usa `reply_to: timesaverautomate@gmail.com`. Respostas, pedidos de oposição, reuniões e propostas ainda exigem intervenção humana; não estão falsamente automatizados.
 
@@ -14,7 +14,7 @@
 
 Na linha correspondente à empresa no separador **Revisão Comercial**:
 - I `Estado de revisão`: escrever **Verificado**, só após verificar o contacto e a entidade.
-- J `Base legal / autorização`: selecionar **Pessoa coletiva - fundamento validado** (apenas quando realmente aplicável) ou **Consentimento documentado**.
+- J `Base legal / autorização`: selecionar **Pessoa coletiva - fundamento validado** (apenas quando realmente aplicável) ou **Consentimento documentado**. **Apenas o segundo valor permite email pelo Resend; o primeiro é para investigação/canal futuro compatível.**
 - M `Natureza jurídica`: indicar **Pessoa coletiva** ou **Pessoa singular**, conforme evidência.
 - N `Consulta DGC (AAAA-MM-DD)`: data da consulta efetiva à lista oficial, obrigatória quando a base invocada é pessoa coletiva, com validade operacional máxima de 31 dias.
 - O `Email confirmado (AAAA-MM-DD)`: data de verificação do email na fonte primária, até 90 dias.
@@ -30,6 +30,8 @@ No separador **Pedidos**, para a mesma empresa:
 
 O motor verifica ainda que a revisão tem a mesma linha de CRM, nome, email e domínio; que o endereço é genérico, empresarial e coincide com o website; que não foi enviado email anteriormente e que não há bloqueios noutra linha.
 
+**IMPORTANTE — RESTRIÇÃO DO RESEND:** a política de utilização de 13/10/2026 proíbe cold outreach, mesmo a pessoas coletivas. O código impede envios Resend com fundamento `Pessoa coletiva - fundamento validado`, ainda que legalmente válido. Os leads sem opt-in continuam no CRM para pesquisa e contacto por canal permitido. Fonte: https://resend.com/legal/acceptable-use
+
 **Importante:** o sistema não consulta sozinho a lista da DGC, não identifica a natureza jurídica a partir do OSM e não confirma automaticamente que o negócio tem 1–50 trabalhadores. A consulta oficial DGC é obrigatória para o fluxo de comunicações não solicitadas às pessoas coletivas, e compete à TimeSaver documentá-la. A documentação escrita **não equivale a validação jurídica do caso**.
 
 Fontes oficiais:
@@ -42,7 +44,7 @@ Fontes oficiais:
 - **Agendamento de envio:** GitHub Actions a 09:30 UTC de segunda a sexta, no grupo de concorrência `timesaver-prospeccao-crm` usado também pela pesquisa.
 - **Modo manual:** GitHub → Actions → `TimeSaver - prospeção aprovada e reconciliação Resend` → Run workflow. Modos `preview`, `send` ou `reconcile`. `send` requer escrever `ENVIAR` no campo de confirmação.
 - **Testes em push:** a alteração dos scripts gera testes e uma pré-visualização real dos contactos, **sem envio**.
-- **Limite:** cinco envios comerciais/dia; zero follow-ups automáticos.
+- **Limite:** cinco envios/dia, **somente a destinatários com opt-in**; zero follow-ups automáticos.
 - **Idempotência:** antes de chamar o Resend, o CRM recebe em V `Reservado: timesaver-b2b-v1-...`. O Resend recebe um `Idempotency-Key` estável por domínio+email.
 - **Falhas/timeout:** a reserva permanece bloqueada e **não deve ser removida nem repetida automaticamente**. Confirmar no painel Resend se houve mensagem e reconciliar manualmente antes de tentar recuperar. A idempotência do Resend só cobre 24 horas.
 - **Confirmação de envio:** uma resposta de sucesso do Resend acrescenta datas R/S, seguimento T, contador U, estado V, ID W, estado comercial J e próxima ação L/M.
