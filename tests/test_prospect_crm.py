@@ -35,6 +35,14 @@ class ProspectCrmTests(unittest.TestCase):
         self.assertEqual(row[23], "Por avaliar")
         self.assertEqual(row[17:23], [""] * 6)
 
+    def test_review_signals_never_authorize_contact(self):
+        self.assertIn("coincide", crm.review_signals("geral@alfa.pt", "https://alfa.pt"))
+        self.assertIn("diferente", crm.review_signals("geral@alfa.pt", "https://outra.pt"))
+        self.assertIn("sem website", crm.review_signals("geral@alfa.pt", ""))
+        row = crm.candidate(sample(), "Porto")
+        self.assertIn("REVER:", row[16])
+        self.assertEqual(row[24], "Sim")
+
     def test_reject_personal_email(self):
         self.assertIsNone(crm.candidate(sample(email="joana@alfa.pt"), "Porto"))
 
