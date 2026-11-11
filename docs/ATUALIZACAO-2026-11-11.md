@@ -50,8 +50,8 @@ O Calendly fornecido é `https://calendly.com/timesaverautomate/30min`. Por corr
 - `npm run check`: **114 testes aprovados**, incluindo oito novos testes do diagnóstico protegido.
 - Playwright em PT e EN a **320, 375, 768, 981 e 1440 px**, sem deslocação horizontal. Foram usados o formulário e o código reais com os serviços externos simulados.
 - Validação do email, descrição de 10 caracteres, caixa de leitura opcional, estados de erro/sucesso e mensagens nas duas línguas.
-- **Não foi enviado email real nesta ronda de testes locais.** A aceitação e a receção efetiva têm de ser verificadas separadamente após publicação.
-- O diagnóstico interno assinado será verificado no GitHub Actions após a publicação, sem criar um pedido de orçamento.
+- Nos testes locais foram usados fornecedores simulados. Após publicação, foi também enviado um pedido real identificado como teste interno através do formulário EN, com descrição de dez caracteres; chegou à INBOX da Time Saver.
+- O diagnóstico interno assinado foi aprovado no GitHub Actions, sem criar um pedido. Uma chamada pública sem assinatura devolveu HTTP 403.
 
 Estas verificações não são uma certificação de acessibilidade, segurança absoluta ou conformidade jurídica integral. As proteções e os fornecedores exigem manutenção. A identificação legal não foi inventada ou publicada como dado pessoal da equipa.
 
@@ -74,12 +74,15 @@ Estas verificações não são uma certificação de acessibilidade, segurança 
 
 Não faltam fotografias nem nomes da equipa: foram retirados do âmbito a pedido do titular.
 
-## Estado final — completar após a publicação
+## Estado final verificado
 
-- Código publicado: **[COMMIT_PUBLICADO]**.
-- GitHub Actions: **[EXECUCAO_GITHUB_ACTIONS]**.
-- Domínio PT/EN, sitemap, robots e cabeçalhos: **[RESULTADO_DOMINIO]**.
-- Verificação interna assinada do CRM: **[RESULTADO_DIAGNOSTICO]**.
-- Envio e receção de email real nesta atualização: **[RESULTADO_EMAIL_REAL]**.
+- Implementação publicada: [`b7cbbba0c14997e94207c19c0eae22c7dfcab88a`](https://github.com/timesaverautomate/time-saver/commit/b7cbbba0c14997e94207c19c0eae22c7dfcab88a).
+- [Publicação GitHub Pages](https://github.com/timesaverautomate/time-saver/actions/runs/42992476526): aprovada.
+- [Domínio, segurança e diagnóstico interno](https://github.com/timesaverautomate/time-saver/actions/runs/42992476438): aprovados. TLS 1.0/1.1 recusados no handshake; TLS 1.2/1.3 confirmados.
+- Oito páginas PT/EN devolveram HTTP 200 no domínio público. Canonical, hreflang, sitemap, robots e cabeçalhos de segurança foram verificados. API e erros continuam sem indexação.
+- Navegação real no domínio a 375 e 1440 px, nas duas línguas: sem erros JavaScript, deslocação horizontal ou cookies observados. A revisão local abrangeu também 320, 768 e 981 px.
+- Pedido real de teste: **TS-796C04A3305ABC969DCB**, enviado pelo formulário EN com uma descrição de dez caracteres. Confirmado na **INBOX em 11/11/2026 às 09:08:56 UTC**. Duplo clique produziu um POST; repetição do mesmo pedido devolveu a mesma referência. A pesquisa dessa referência encontrou um único email.
+- SPF, DKIM e DMARC foram aprovados pelo Gmail nessa mensagem. A política DMARC observada é de monitorização (`p=none`); não se afirma que imponha rejeição de mensagens falsificadas.
+- O teste foi identificado como **TESTE INTERNO — atualização PT/EN 11-11-2026**. O processamento existente inclui a folha privada do CRM; não foram apagados registos. O acesso à folha foi verificado pelo workflow, mas a linha deste teste não foi consultada separadamente nesta ronda.
 
-Os marcadores desta última secção são de validação da entrega, não configurações do sítio. Devem ser substituídos pelos resultados efetivamente observados, sem declarar testes que não tenham sido executados.
+O único marcador de configuração acrescentado que falta preencher é o número de WhatsApp. A identificação legal continua fora da publicação por opção do titular; este trabalho não atesta que essa opção satisfaça as obrigações legais aplicáveis.
