@@ -8,18 +8,25 @@ O motor programa 8 zonas/dia: 3 subúrbios na região do Porto, 2 na região de 
 
 A localidade do CRM é retirada de `addr:city` quando a fonte a fornece. Quando não existe, apresenta-se `Área de <zona> (aproximada)` e uma nota a pedir confirmação. A ausência de website não elimina um candidato que tenha uma caixa comercial genérica identificada; exige investigação adicional.
 
-## Setores e pontuação
-Preferência inicial: contabilidade, imobiliário e distribuição. Outros serviços e lojas empresariais podem entrar no funil, com prioridade inferior.
+## Prioridade absoluta: dimensão da empresa
 
-A pontuação comercial de 0–100 serve **apenas para ordenar a investigação**:
-- Adequação do setor: máximo 35.
-- Geografia (preferência por subúrbios): máximo 25.
-- Contacto e consistência de domínio: máximo 20.
-- Dimensão: máximo 15, **só depois de prova/revisão** no CRM (`DIMENSAO_VERIFICADA=N`).
-- Processo administrativo comprovado: máximo 5, **só após verificação humana** (`PROCESSO_VALIDADO=Sim`).
-- Marca/cadeia indicada no OSM: penalização de 10, não exclusão automática.
+A ordem de investigação e de seleção do lote comercial é **lexicográfica**:
+1. **Microempresas verificadas** (1–9 trabalhadores).
+2. **Pequenas empresas verificadas** (10–49 trabalhadores).
+3. **Empresas de dimensão desconhecida, sem sinal de marca/cadeia** — entram para investigação, sem classificação fictícia.
+4. **Empresas de dimensão desconhecida, com marca/cadeia indicada** — entram mais tarde, sem presumir que são grandes.
+5. **Empresas comprovadamente com 50 ou mais trabalhadores são excluídas** deste funil, independentemente do setor ou da localização.
 
-Dimensão desconhecida não significa grande empresa; não recebe pontos inventados. A pontuação não é uma probabilidade de compra.
+A dimensão é registada apenas quando existe `DIMENSAO_VERIFICADA=N` acompanhada de `FONTE_DIMENSAO=https://...` nas notas do CRM e verificação humana. O OpenStreetMap raramente apresenta colaboradores, pelo que a maioria dos candidatos encontrados automaticamente permanece **por confirmar**. A ausência de marca não constitui prova de pequena dimensão.
+
+**Somente dentro de cada nível de dimensão** aplicam-se os fatores secundários:
+- Setor: 1.º contabilidade, imobiliário e distribuição; 2.º serviços empresariais, ofícios, comércio especializado e áreas operacionais adjacentes; 3.º restantes atividades compatíveis com as pesquisas.
+- Localização: 1.º subúrbios; 2.º cidades regionais; 3.º centros Porto/Lisboa.
+- Consistência do domínio do email com o website oficial, que exige sempre revisão posterior.
+
+A seleção tenta primeiro o setor mais relevante dentro do nível de dimensão; quando faltam candidatos, aceita os setores secundários e só depois os terciários. **Nunca** promove uma empresa sem dimensão confirmada à frente de uma micro/pequena verificada só porque a sua cidade ou CAE aproximado tem pontuação superior.
+
+O score 0–100 é auxiliar e não determina a ordem principal. O setor OSM é uma categoria indicativa, **não um CAE oficial**; CAE e nº de trabalhadores exigem fontes empresariais verificáveis.
 
 ## Segurança, deduplicação e limites
 Deduplicação por email, domínio, identificador de origem OSM e nome+localidade; o motor reconfirma antes de cada escrita. Até **15 novas linhas/dia**, com **máximo 5 por zona** na seleção inicial. Não se faz scraping ao Google Maps nem se usa uma base comercial paga sem licença. O OSM é um ponto de partida, não uma validação completa.
@@ -34,8 +41,8 @@ Registar por zona/setor: candidatos descobertos, novos após deduplicação, sit
 
 ## Circuito comercial completo — dois canais separados
 
-1. **Descoberta OSM**: 8 zonas rotativas, preferência por subúrbios e empresas de menor dimensão. Pesquisa apenas pontos com email registado, sem presumir que a empresa é micro ou pequena.
-2. **Qualificação**: excluir duplicados por email, domínio, identidade e OSM; atribuir score comercial apenas com factos observáveis; limite de 15 registos por dia e máximo de 5 por zona.
+1. **Descoberta OSM**: 8 zonas rotativas; dimensão comprovada prevalece sobre setor e localização; subúrbios servem para desempate. Pesquisa apenas pontos com email registado, sem presumir que a empresa é micro ou pequena.
+2. **Qualificação**: excluir duplicados por email, domínio, identidade e OSM; aplicar primeiro o escalão de dimensão, depois setor e localização; limite de 15 registos por dia e máximo de 5 por zona.
 3. **Revisão Comercial**: novos contactos entram bloqueados em `Pedidos` e na lista de revisão. Verificar sociedade, email, domínio, atividade, indícios de dimensão, fonte e data; preencher campos M:S da aba de revisão; nunca gerar autorizações automaticamente.
 4. **Canal de prospeção inicial**: pesquisa e preparação de rascunhos para avaliação. Contactos sem consentimento comprovado **não podem ser enviados pelo Resend**, mesmo que certas comunicações a sociedades sejam permitidas na legislação portuguesa. Não usar a infraestrutura Resend para cold outreach.
 5. **Canal Resend opt-in**: apenas para destinatários com consentimento documentado e aprovação humana. `outreach-legal.yml` seleciona, limita a 5 envios por dia útil, reserva antes do envio, usa idempotência, grava identificador de mensagem e datas de contacto no CRM. Não faz follow-ups automáticos.
