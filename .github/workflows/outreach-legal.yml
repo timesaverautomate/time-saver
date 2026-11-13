@@ -20,8 +20,8 @@ name: TimeSaver - prospeção aprovada e reconciliação Resend
       - 'scripts/prospect_crm.py'
       - 'tests/test_outreach_approved.py'
   schedule:
-    - cron: '30 9 * * 1-5'
-    - cron: '30 15 * * 1-5' # Segunda janela para autorizações obtidas durante o dia
+    # Resend continua apenas para mensagens transacionais e reconciliação.
+    # Evitar dois fornecedores a enviar campanhas no mesmo dia.
     - cron: '30 16 * * *'
 permissions:
   contents: read
