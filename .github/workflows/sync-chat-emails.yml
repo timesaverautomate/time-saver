@@ -1,0 +1,53 @@
+name: TimeSaver - registar emails enviados em Pedidos chat
+'on':
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        required: true
+        default: preview
+        options: [preview, sync]
+        description: 'Pré-visualização ou sincronização de emails já enviados'
+      confirm:
+        type: string
+        required: false
+        description: 'Em modo sync, escrever SINCRONIZAR'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sync-chat-emails.yml'
+      - 'scripts/sync_chat_sent.py'
+      - 'tests/test_sync_chat_sent.py'
+  schedule:
+    - cron: '15 17 * * 1-5'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.event_name == 'push' && github.workflow || 'timesaver-prospeccao-crm' }}
+  cancel-in-progress: false
+jobs:
+  validar:
+    if: github.repository_id == '1452563434' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Auditar dependências e segredos
+        run: python scripts/audit-repository-secrets.py
+      - name: Instalar dependências verificadas
+        run: >-
+          python -m pip install --index-url https://pypi.org/simple --require-hashes --only-binary=:all: -r requirements-crm.txt
+      - name: Testar espelho de emails (sem envios)
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Confirmar registos de envios no CRM
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          CHAT_SENT_SYNC_MODE: ${{ github.event_name == 'schedule' && 'sync' || inputs.mode || 'preview' }}
+          CHAT_SENT_CONFIRM: ${{ inputs.confirm }}
+        run: python scripts/sync_chat_sent.py
