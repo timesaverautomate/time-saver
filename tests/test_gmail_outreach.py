@@ -5,6 +5,8 @@ import re
 import sys
 import unittest
 from datetime import date
+from email.parser import BytesParser
+from email import policy
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -122,10 +124,11 @@ class GmailOutreachTests(unittest.TestCase):
 
     def test_mime_email_from_expected_sender_and_optout(self):
         r = lead()
-        msg = base64.urlsafe_b64decode(gmail.email_raw(r, review_for(r))+"===")
-        self.assertIn(b"timesaverautomate@gmail.com", msg)
-        self.assertIn(b"geral@exemplo.pt", msg)
-        self.assertIn("Não contactar".encode("utf-8")[:3], msg.replace(b"\n",b""))
+        raw = base64.urlsafe_b64decode(gmail.email_raw(r, review_for(r))+"===")
+        parsed = BytesParser(policy=policy.default).parsebytes(raw)
+        self.assertEqual(parsed["From"].addresses[0].addr_spec, "timesaverautomate@gmail.com")
+        self.assertEqual(parsed["To"].addresses[0].addr_spec, "geral@exemplo.pt")
+        self.assertIn("Não contactar", parsed.get_content())
 
     def test_zero_eligible_sends_nothing_and_no_oauth(self):
         r = lead()
