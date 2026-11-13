@@ -50,6 +50,31 @@ jobs:
           python -m pip install --index-url https://pypi.org/simple --require-hashes --only-binary=:all: -r requirements-crm.txt
       - name: Testar Gmail, CRM e autorizações sem enviar
         run: python -m unittest discover -s tests -p 'test_*.py' -v
+  crm_preview_real:
+    needs: validar
+    # Releitura autenticada real do CRM em push seguro: nunca carrega OAuth nem envia.
+    if: github.event_name == 'push' && github.repository_id == '1452563434' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Auditar histórico de segredos
+        run: python scripts/audit-repository-secrets.py
+      - name: Instalar dependências com hashes
+        run: >-
+          python -m pip install --index-url https://pypi.org/simple --require-hashes --only-binary=:all: -r requirements-crm.txt
+      - name: Testar elegibilidade real do CRM - Gmail desligado
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GMAIL_OUTREACH_MODE: preview
+          GMAIL_SEND_ENABLED: 'false'
+        run: python scripts/gmail_outreach.py
   gmail:
     if: github.repository_id == '1452563434' && github.ref == 'refs/heads/main' && github.event_name != 'push'
     runs-on: ubuntu-latest
