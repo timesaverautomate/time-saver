@@ -19,6 +19,13 @@
 
 **Teto, não meta obrigatória.** Enviam-se apenas as mensagens para contactos elegíveis que existem efetivamente no CRM, mesmo que isso seja zero. A quota já conta emails comerciais registados no CRM noutro fornecedor nesse mesmo dia. A execução ocorre nos dias úteis às 10:15 UTC (no horário de verão, às 11:15 em Portugal continental).
 
+## Teste de integração — 13/11/2026
+
+- GitHub Actions: https://github.com/timesaverautomate/time-saver/actions/runs/43450611325
+- **80 testes unitários passaram.** Incluem: limite por semana, OAuth de conta incorreta, recusa sem prova, deduplicação, reserva técnica, MIME Gmail e simulação de timeout.
+- O job `crm_preview_real` executou com autenticação do Google Sheets: **26 contactos verificados, 0 autorização comercial elegível, 0 envios**.
+- **Nenhuma chamada à API Gmail de produção foi feita.** A ligação OAuth do remetente não está criada nos segredos deste GitHub; a variável de ativação permanece por configurar.
+
 ## 1. Autorizar timesaverautomate@gmail.com — OAuth (ação do titular)
 
 1. Entrar em https://console.cloud.google.com/ com a conta TimeSaver e criar/selecionar projeto. Ativar a **Gmail API** em APIs e serviços.
