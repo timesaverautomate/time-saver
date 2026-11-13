@@ -90,7 +90,7 @@ html.booking-open{overflow:hidden;scrollbar-gutter:stable}
 .quote-heading-aside{display:grid;justify-items:end;gap:20px}
 .quote-heading-aside .price-note{padding:0;background:none;border:0;margin:0;max-width:none;text-align:right}
 .quote-heading-aside .price-note p{font-size:14px;color:#244e3f;margin:0;line-height:1.8}
-.quote-heading-aside .price-note p+p{font-size:12px}
+.quote-heading-aside .price-note p:last-child{font-size:12px}
 .quote-heading-aside .direct-contact{border:0;padding:0;margin:0;max-width:none;text-align:right}
 .quote-heading-aside .direct-contact h3{font-size:14px;margin:0 0 7px}
 .quote-heading-aside .contact-actions{justify-content:flex-end;margin-top:13px}
