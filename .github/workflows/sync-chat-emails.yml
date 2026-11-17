@@ -12,14 +12,6 @@ name: TimeSaver - registar emails enviados em Pedidos chat
         type: string
         required: false
         description: 'Em modo sync, escrever SINCRONIZAR'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/sync-chat-emails.yml'
-      - 'scripts/sync_chat_sent.py'
-      - 'tests/test_sync_chat_sent.py'
-  schedule:
-    - cron: '15 17 * * 1-5'
 permissions:
   contents: read
 concurrency:
